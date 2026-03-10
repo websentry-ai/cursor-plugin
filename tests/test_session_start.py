@@ -56,7 +56,7 @@ class TestSessionStartMissingKey:
         code, out = _capture("{}", {}, capsys)
         assert code == 0
         assert "additional_context" in out
-        assert "UNBOUND_API_KEY" in out["additional_context"]
+        assert "UNBOUND_CURSOR_API_KEY" in out["additional_context"]
         assert "setup" in out["additional_context"].lower()
 
     def test_continue_is_true(self, capsys):
@@ -67,17 +67,17 @@ class TestSessionStartMissingKey:
 class TestSessionStartWithKey:
 
     def test_outputs_active_status(self, capsys):
-        code, out = _capture("{}", {"UNBOUND_API_KEY": "test-key-12345"}, capsys)
+        code, out = _capture("{}", {"UNBOUND_CURSOR_API_KEY": "test-key-12345"}, capsys)
         assert code == 0
         assert "additional_context" in out
         assert "active" in out["additional_context"].lower()
 
     def test_continue_is_true(self, capsys):
-        _, out = _capture("{}", {"UNBOUND_API_KEY": "key"}, capsys)
+        _, out = _capture("{}", {"UNBOUND_CURSOR_API_KEY": "key"}, capsys)
         assert out["continue"] is True
 
     def test_does_not_mention_setup(self, capsys):
-        _, out = _capture("{}", {"UNBOUND_API_KEY": "key"}, capsys)
+        _, out = _capture("{}", {"UNBOUND_CURSOR_API_KEY": "key"}, capsys)
         assert "setup.py" not in out["additional_context"]
 
 
@@ -91,7 +91,7 @@ class TestSessionStartBackgroundAgent:
 
     def test_skips_even_with_key(self, capsys):
         payload = json.dumps({"is_background_agent": True})
-        _, out = _capture(payload, {"UNBOUND_API_KEY": "key"}, capsys)
+        _, out = _capture(payload, {"UNBOUND_CURSOR_API_KEY": "key"}, capsys)
         assert out == {"continue": True}
 
 

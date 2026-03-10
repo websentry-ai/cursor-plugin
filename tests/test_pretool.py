@@ -145,14 +145,14 @@ class TestPreToolUseHandlerOutput:
 
     def test_no_api_key_prints_allow(self, capsys):
         with patch.dict(os.environ, {}, clear=True):
-            os.environ.pop("UNBOUND_API_KEY", None)
+            os.environ.pop("UNBOUND_CURSOR_API_KEY", None)
             hh.handle_pre_tool_use(self.PAYLOAD)
         out = json.loads(capsys.readouterr().out)
         assert out["decision"] == "allow"
 
     def test_api_deny_prints_deny(self, capsys):
         with patch.object(hh, "_call_pretool_api", return_value={"decision": "deny", "reason": "Blocked"}), \
-             patch.dict(os.environ, {"UNBOUND_API_KEY": "key"}):
+             patch.dict(os.environ, {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_pre_tool_use(self.PAYLOAD)
         out = json.loads(capsys.readouterr().out)
         assert out["decision"] == "deny"
@@ -160,28 +160,28 @@ class TestPreToolUseHandlerOutput:
 
     def test_api_allow_prints_allow(self, capsys):
         with patch.object(hh, "_call_pretool_api", return_value={"decision": "allow"}), \
-             patch.dict(os.environ, {"UNBOUND_API_KEY": "key"}):
+             patch.dict(os.environ, {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_pre_tool_use(self.PAYLOAD)
         out = json.loads(capsys.readouterr().out)
         assert out["decision"] == "allow"
 
     def test_api_exception_prints_allow(self, capsys):
         with patch.object(hh, "_call_pretool_api", side_effect=RuntimeError("boom")), \
-             patch.dict(os.environ, {"UNBOUND_API_KEY": "key"}):
+             patch.dict(os.environ, {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_pre_tool_use(self.PAYLOAD)
         out = json.loads(capsys.readouterr().out)
         assert out["decision"] == "allow"
 
     def test_empty_api_response_prints_allow(self, capsys):
         with patch.object(hh, "_call_pretool_api", return_value={}), \
-             patch.dict(os.environ, {"UNBOUND_API_KEY": "key"}):
+             patch.dict(os.environ, {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_pre_tool_use(self.PAYLOAD)
         out = json.loads(capsys.readouterr().out)
         assert out["decision"] == "allow"
 
     def test_output_is_valid_json(self, capsys):
         with patch.dict(os.environ, {}, clear=True):
-            os.environ.pop("UNBOUND_API_KEY", None)
+            os.environ.pop("UNBOUND_CURSOR_API_KEY", None)
             hh.handle_pre_tool_use(self.PAYLOAD)
         raw = capsys.readouterr().out.strip()
         parsed = json.loads(raw)

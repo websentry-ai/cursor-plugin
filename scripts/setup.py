@@ -304,8 +304,13 @@ def run_one_shot_callback_server(frontend_url: str) -> Optional[Dict[str, any]]:
         thread.start()
 
         encoded_callback = urllib.parse.quote(callback_url, safe="")
-        target_url = f"{frontend_url.rstrip('/')}/automations/api-key-callback?callback_url={encoded_callback}&app_type=default"
-        webbrowser.open(target_url)
+        target_url = f"{frontend_url.rstrip('/')}/automations/api-key-callback?callback_url={encoded_callback}&app_type=cursor"
+        # Use macOS `open` directly to avoid osascript errors with Chrome,
+        # fall back to webbrowser module on other platforms.
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", target_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            webbrowser.open(target_url)
         print("Opening browser...")
         print("If browser doesn't open automatically, open this link:")
         print(target_url)
@@ -334,12 +339,12 @@ def clear_setup() -> None:
     print("Cursor - Clearing Setup")
     print("=" * 60)
 
-    # Remove UNBOUND_API_KEY
-    success, _ = remove_env_var("UNBOUND_API_KEY")
+    # Remove UNBOUND_CURSOR_API_KEY
+    success, _ = remove_env_var("UNBOUND_CURSOR_API_KEY")
     if success:
-        print("Removed UNBOUND_API_KEY")
+        print("Removed UNBOUND_CURSOR_API_KEY")
     else:
-        print("Failed to remove UNBOUND_API_KEY")
+        print("Failed to remove UNBOUND_CURSOR_API_KEY")
 
     print("\n" + "=" * 60)
     print("Clear Complete!")
@@ -372,9 +377,9 @@ def main():
     print("Cursor - Environment Setup")
     print("=" * 60)
 
-    # Flush previously set UNBOUND_API_KEY so we can write a fresh one
+    # Flush previously set UNBOUND_CURSOR_API_KEY so we can write a fresh one
     try:
-        remove_env_var("UNBOUND_API_KEY")
+        remove_env_var("UNBOUND_CURSOR_API_KEY")
     except Exception:
         pass
 
@@ -401,12 +406,12 @@ def main():
     print("API Key Verified")
     debug_print("API key verification successful")
 
-    debug_print("Setting UNBOUND_API_KEY environment variable...")
-    success, message = set_env_var("UNBOUND_API_KEY", api_key)
+    debug_print("Setting UNBOUND_CURSOR_API_KEY environment variable...")
+    success, message = set_env_var("UNBOUND_CURSOR_API_KEY", api_key)
     if not success:
-        print(f"Failed to configure UNBOUND_API_KEY: {message}")
+        print(f"Failed to configure UNBOUND_CURSOR_API_KEY: {message}")
         sys.exit(1)
-    debug_print("UNBOUND_API_KEY set successfully")
+    debug_print("UNBOUND_CURSOR_API_KEY set successfully")
 
     # Final instructions
     print("\n" + "=" * 60)

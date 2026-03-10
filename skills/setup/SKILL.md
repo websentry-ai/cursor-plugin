@@ -15,7 +15,7 @@ You are helping the user configure the Unbound AI plugin for Cursor. Follow thes
 Run this command to check whether the API key is already configured:
 
 ```bash
-echo "${UNBOUND_API_KEY:0:8}..."
+echo "${UNBOUND_CURSOR_API_KEY:0:8}..."
 ```
 
 **If the variable is unset or empty**, proceed to Step 2.
@@ -69,7 +69,7 @@ Run:
 
 ```bash
 curl -fsSL -o /dev/null -w "%{http_code}" \
-  -H "Authorization: Bearer $UNBOUND_API_KEY" \
+  -H "Authorization: Bearer $UNBOUND_CURSOR_API_KEY" \
   https://api.getunbound.ai/v1/models
 ```
 
@@ -89,7 +89,7 @@ Interpret the result:
 Print a summary like this (adapt `<RC_FILE>` to the actual RC file for the user's shell):
 
 ```
-UNBOUND_API_KEY saved to <RC_FILE>
+UNBOUND_CURSOR_API_KEY saved to <RC_FILE>
 API connectivity verified (HTTP 200)
 Unbound plugin is active
 

@@ -8,7 +8,7 @@ Hooks:
   sessionEnd        — builds full LLM exchange and sends to Unbound API.
 
 Environment variables:
-    UNBOUND_API_KEY  Bearer token for the Unbound API.
+    UNBOUND_CURSOR_API_KEY  Bearer token for the Unbound API.
                      If unset, all hooks fail open (allow / no-op).
 """
 
@@ -48,6 +48,18 @@ from adapter import (  # noqa: E402
 LOG_DIR = Path.home() / ".unbound" / "logs"
 DEBUG_LOG = LOG_DIR / "debug.jsonl"
 OFFLINE_LOG = LOG_DIR / "offline-events.jsonl"
+TRACE_LOG = LOG_DIR / "trace.log"
+
+
+def _trace(msg: str) -> None:
+    """Append a human-readable trace line to ~/.unbound/logs/trace.log."""
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3]
+        with TRACE_LOG.open("a") as f:
+            f.write(f"[{ts}] {msg}\n")
+    except Exception:
+        pass
 
 
 def write_debug_log(event: str, payload: dict) -> None:
@@ -101,17 +113,23 @@ def handle_pre_tool_use(payload: dict) -> None:
       - API error / timeout    -> allow (fail open)
       - Any unexpected error   -> allow (fail open)
     """
-    api_key = os.getenv("UNBOUND_API_KEY")
+    api_key = os.getenv("UNBOUND_CURSOR_API_KEY")
+    _trace(f"preToolUse | key={'set' if api_key else 'MISSING'} | tool={payload.get('tool_name','?')} | session={payload.get('session_id','?')[:8]}")
     if not api_key:
+        _trace("preToolUse | SKIP: no API key, returning fail-open allow")
         print(json.dumps(format_fail_open("preToolUse")))
         return
 
     try:
+        _trace("preToolUse | calling API...")
         api_response = _call_pretool_api(payload, api_key)
-    except Exception:
+        _trace(f"preToolUse | API response: {json.dumps(api_response)[:200]}")
+    except Exception as e:
+        _trace(f"preToolUse | API EXCEPTION: {e}")
         api_response = {}
 
     result = format_pretool_output(api_response)
+    _trace(f"preToolUse | output: {json.dumps(result)}")
     print(json.dumps(result))
 
 
@@ -128,20 +146,29 @@ def handle_before_submit_prompt(payload: dict) -> None:
     - No API key         -> skip policy check, log, fail open.
     - API error/timeout  -> skip policy check, log, fail open.
     """
-    api_key = os.getenv("UNBOUND_API_KEY")
+    api_key = os.getenv("UNBOUND_CURSOR_API_KEY")
+    _trace(f"beforeSubmitPrompt | key={'set' if api_key else 'MISSING'} | prompt={payload.get('prompt','')[:50]} | session={payload.get('session_id','?')[:8]}")
 
     if api_key:
         try:
+            _trace("beforeSubmitPrompt | calling API...")
             api_response = _call_user_prompt_api(payload, api_key)
-        except Exception:
+            _trace(f"beforeSubmitPrompt | API response: {json.dumps(api_response)[:200]}")
+        except Exception as e:
+            _trace(f"beforeSubmitPrompt | API EXCEPTION: {e}")
             api_response = {}
 
         result = format_prompt_output(api_response)
+        _trace(f"beforeSubmitPrompt | formatted: {json.dumps(result)}")
         if result.get("continue") is False:
+            _trace("beforeSubmitPrompt | BLOCKED — not logging prompt")
             print(json.dumps(result))
             return  # Do not log blocked prompts
+    else:
+        _trace("beforeSubmitPrompt | SKIP: no API key, fail open")
 
     # Allowed — log so sessionEnd can reconstruct the full exchange
+    _trace("beforeSubmitPrompt | allowed — logging to audit")
     _audit_log(_make_log_entry("beforeSubmitPrompt", payload))
 
 
@@ -151,6 +178,7 @@ def handle_before_submit_prompt(payload: dict) -> None:
 
 def handle_post_tool_use(payload: dict) -> None:
     """postToolUse: append tool use to audit log for aggregation on sessionEnd."""
+    _trace(f"postToolUse | tool={payload.get('tool_name','?')} | session={payload.get('session_id','?')[:8]}")
     _audit_log(_make_log_entry("postToolUse", payload))
 
 
@@ -167,7 +195,7 @@ def handle_session_end(payload: dict) -> None:
     """
     _audit_log(_make_log_entry("sessionEnd", payload))
 
-    api_key = os.getenv("UNBOUND_API_KEY")
+    api_key = os.getenv("UNBOUND_CURSOR_API_KEY")
     if not api_key:
         return
 
@@ -244,14 +272,18 @@ def main() -> None:
     except json.JSONDecodeError:
         payload = {"raw": raw}
 
+    _trace(f"--- DISPATCH {event} ---")
     write_debug_log(event, payload)
 
     # Normalize Cursor payload for unbound.py compatibility
     payload = normalize_input(event, payload)
+    _trace(f"normalized | session_id={payload.get('session_id','?')[:8]} | tool={payload.get('tool_name','')} | hook_event={payload.get('hook_event_name','')}")
 
     handler = HANDLERS.get(event)
     if handler:
         handler(payload)
+    else:
+        _trace(f"NO HANDLER for event: {event}")
 
     sys.exit(0)
 

@@ -84,7 +84,7 @@ class TestSessionEnd:
         with patch.object(hh, "_audit_log") as mock_log, \
              patch.object(hh, "_load_logs", return_value=[]), \
              patch.dict("os.environ", {}, clear=True):
-            os.environ.pop("UNBOUND_API_KEY", None)
+            os.environ.pop("UNBOUND_CURSOR_API_KEY", None)
             hh.handle_session_end(self._PAYLOAD)
         mock_log.assert_called_once()
         entry = mock_log.call_args[0][0]
@@ -94,7 +94,7 @@ class TestSessionEnd:
         with patch.object(hh, "_audit_log"), \
              patch.object(hh, "_send_exchange") as mock_send, \
              patch.dict("os.environ", {}, clear=True):
-            os.environ.pop("UNBOUND_API_KEY", None)
+            os.environ.pop("UNBOUND_CURSOR_API_KEY", None)
             hh.handle_session_end(self._PAYLOAD)
         mock_send.assert_not_called()
 
@@ -117,7 +117,7 @@ class TestSessionEnd:
              patch.object(hh, "_send_exchange", return_value=True) as mock_send, \
              patch.object(hh, "_save_logs") as mock_save, \
              patch.object(hh, "_cleanup_logs"), \
-             patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+             patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_session_end(self._PAYLOAD)
 
         mock_send.assert_called_once_with(exchange, "key")
@@ -137,7 +137,7 @@ class TestSessionEnd:
              patch.object(hh, "_cleanup_logs"), \
              patch.object(hh, "OFFLINE_LOG", offline_file), \
              patch.object(hh, "LOG_DIR", tmp_path), \
-             patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+             patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_session_end(self._PAYLOAD)
 
         assert offline_file.exists()
@@ -150,14 +150,14 @@ class TestSessionEnd:
              patch.object(hh, "_build_exchange", return_value=None), \
              patch.object(hh, "_send_exchange") as mock_send, \
              patch.object(hh, "_cleanup_logs"), \
-             patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+             patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_session_end(self._PAYLOAD)
         mock_send.assert_not_called()
 
     def test_exception_does_not_propagate(self):
         with patch.object(hh, "_audit_log"), \
              patch.object(hh, "_load_logs", side_effect=RuntimeError("disk full")), \
-             patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+             patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_session_end(self._PAYLOAD)  # should not raise
 
 
@@ -187,7 +187,7 @@ class TestSessionEndFiltering:
              patch.object(hh, "_send_exchange", return_value=True), \
              patch.object(hh, "_save_logs"), \
              patch.object(hh, "_cleanup_logs"), \
-             patch.dict(os.environ, {"UNBOUND_API_KEY": "key"}):
+             patch.dict(os.environ, {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_session_end(self._PAYLOAD)
         events = mock_build.call_args[0][0]
         assert len(events) == 2
@@ -205,7 +205,7 @@ class TestSessionEndFiltering:
              patch.object(hh, "_send_exchange", return_value=True), \
              patch.object(hh, "_save_logs"), \
              patch.object(hh, "_cleanup_logs"), \
-             patch.dict(os.environ, {"UNBOUND_API_KEY": "key"}):
+             patch.dict(os.environ, {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_session_end(self._PAYLOAD)
         events = mock_build.call_args[0][0]
         assert all(e["session_id"] == "s1" for e in events)
@@ -216,6 +216,6 @@ class TestSessionEndFiltering:
              patch.object(hh, "_load_logs", return_value=logs), \
              patch.object(hh, "_send_exchange") as mock_send, \
              patch.object(hh, "_cleanup_logs"), \
-             patch.dict(os.environ, {"UNBOUND_API_KEY": "key"}):
+             patch.dict(os.environ, {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_session_end(self._PAYLOAD)
         mock_send.assert_not_called()

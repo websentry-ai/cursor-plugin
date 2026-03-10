@@ -28,8 +28,11 @@ Search for **Unbound** in the Cursor marketplace panel, or visit [cursor.com/mar
 
 ```bash
 git clone https://github.com/websentry-ai/cursor-extension.git
-# Install via Cursor's plugin settings
+cd cursor-extension
+./install.sh
 ```
+
+This single command installs hooks, opens your browser for authentication, and saves your API key. Restart Cursor after.
 
 ---
 
@@ -37,7 +40,7 @@ git clone https://github.com/websentry-ai/cursor-extension.git
 
 ### Automatic (recommended)
 
-Start a new conversation in Cursor. If `UNBOUND_API_KEY` is not set, the AI will automatically prompt you to run setup.
+Start a new conversation in Cursor. If `UNBOUND_CURSOR_API_KEY` is not set, the AI will automatically detect it and run the setup script for you — browser opens, you authenticate, done.
 
 ### Manual
 
@@ -64,7 +67,7 @@ After setup, test with:
 For fleet deployment where users cannot disable the plugin, see [`enterprise/README.md`](enterprise/README.md).
 
 Options:
-1. **MDM**: Deploy `hooks.json` to the system-wide Cursor path + provision `UNBOUND_API_KEY` per device
+1. **MDM**: Deploy `hooks.json` to the system-wide Cursor path + provision `UNBOUND_CURSOR_API_KEY` per device
 2. **Team Marketplace**: Import the plugin repo in your Cursor Team Dashboard and mark as "required"
 
 ---
@@ -73,7 +76,7 @@ Options:
 
 | Variable | Description |
 |---|---|
-| `UNBOUND_API_KEY` | Bearer token for the Unbound API. Get one at https://app.getunbound.ai > Settings > API Keys |
+| `UNBOUND_CURSOR_API_KEY` | Bearer token for the Unbound API. Get one at https://app.getunbound.ai > Settings > API Keys |
 
 ---
 
@@ -91,6 +94,8 @@ Options:
 ## Project structure
 
 ```
+install.sh                 Single-command installer
+uninstall.sh               Clean uninstaller
 .cursor-plugin/
   plugin.json              Plugin manifest
   marketplace.json         Marketplace catalog
@@ -127,8 +132,11 @@ tests/
 pip install pytest
 python3 -m pytest tests/ -v
 
-# Install locally
-# Use Cursor's plugin settings to add from local path
+# Install locally for testing
+./install.sh
+
+# Uninstall
+./uninstall.sh
 ```
 
 ---

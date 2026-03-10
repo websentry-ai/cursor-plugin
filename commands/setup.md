@@ -1,9 +1,8 @@
 ---
-description: Guide for setting up, reconfiguring, or troubleshooting the Unbound security plugin. Covers API key configuration, connectivity verification, and restart instructions.
-alwaysApply: false
+description: Configure Unbound AI credentials and verify connectivity. Use for first-time setup, reconfiguration, or troubleshooting.
 ---
 
-# Unbound Setup Guide
+# Unbound Setup
 
 You are helping the user configure the Unbound AI plugin for Cursor. Follow these steps precisely and in order. The API key is handled entirely by the setup script — you never see, store, or echo it.
 
@@ -28,34 +27,30 @@ echo "${UNBOUND_CURSOR_API_KEY:0:8}..."
 
 ## Step 2 — Authenticate via browser
 
-Run the setup script — it handles everything (local callback server, browser auth, key persistence to RC file).
-
-**Important:** Use the absolute path provided in the sessionStart context. If no absolute path was provided, locate `setup.py` relative to this rule file's plugin root:
+Run the setup script — it handles everything (local callback server, browser auth, key persistence to RC file):
 
 ```bash
-python3 <PLUGIN_ROOT>/scripts/setup.py --domain gateway.getunbound.ai
+python3 "${CURSOR_PLUGIN_ROOT}/scripts/setup.py" --domain gateway.getunbound.ai
 ```
-
-For local clones, `<PLUGIN_ROOT>` is wherever you cloned the repo. For marketplace installs, it's the plugin's install directory.
 
 The script prints progress messages to stdout. Check the exit code:
 
 - **Exit code 0**: Setup succeeded. The script has persisted the key to the user's shell RC file.
 - **Non-zero exit code**: Setup failed. Show the script's output to the user and offer to retry.
 
-**Security property:** The API key never appears in chat, terminal output, or agent context. It exists only inside the setup script's process memory and the RC file on disk.
+**Security property:** The API key never appears in chat, bash commands, or terminal output. It exists only inside the setup script's process memory and the RC file on disk.
 
 ---
 
 ## Step 3 — Load the new key into the current shell
 
-The setup script wrote the key to the RC file but it is not yet available in this shell session. Source the RC file:
+The setup script wrote the key to the RC file but it is not yet available in this shell session. Source the RC file so the connectivity check can use it:
 
 ```bash
 source <RC_FILE>
 ```
 
-Use the RC file for the user's OS and shell:
+Use the same RC file the setup script reported (shown in its "Setup Complete!" output). The mapping is:
 
 | OS | Shell | RC file |
 |---|---|---|
@@ -100,7 +95,7 @@ IMPORTANT: You must restart Cursor for hooks to use the new key.
   Cursor hooks inherit the environment from when Cursor was launched,
   so the key must be loaded BEFORE starting Cursor.
 
-  Close Cursor and reopen it to pick up the new environment variable.
+  Close Cursor completely (Cmd+Q) and reopen it.
 
 What happens next:
   - Every tool use (Shell, Read, Write...) is checked against your Unbound policies
@@ -115,7 +110,7 @@ If connectivity failed, end with:
 ```
 API unreachable — plugin installed but running in fail-open mode.
     All tool uses will be allowed until connectivity is restored.
-    Check your API key and network, then ask about Unbound setup again.
+    Check your API key and network, then run /unbound-cursor:setup again.
 ```
 
 ---

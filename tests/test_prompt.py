@@ -56,7 +56,7 @@ class TestPromptPayload:
     def test_prompt_sent_as_user_message(self, mock_run):
         mock_run.return_value = _api_ok("allow")
         with patch.object(hh, "_audit_log"):
-            with patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+            with patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
                 hh.handle_before_submit_prompt(
                     {"session_id": "s1", "prompt": "hello world"}
                 )
@@ -69,7 +69,7 @@ class TestPromptPayload:
     def test_uses_cursor_app_label(self, mock_run):
         mock_run.return_value = _api_ok("allow")
         with patch.object(hh, "_audit_log"):
-            with patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+            with patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
                 hh.handle_before_submit_prompt(
                     {"session_id": "my-session", "prompt": "test"}
                 )
@@ -88,7 +88,7 @@ class TestPromptResponse:
     @patch("subprocess.run")
     def test_deny_outputs_continue_false(self, mock_run, capsys):
         mock_run.return_value = _api_ok("deny", "PII detected")
-        with patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+        with patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
             hh.handle_before_submit_prompt({"session_id": "s", "prompt": "my SSN is 123"})
         out = json.loads(capsys.readouterr().out)
         assert out["continue"] is False
@@ -98,7 +98,7 @@ class TestPromptResponse:
     def test_allow_produces_no_output(self, mock_run, capsys):
         mock_run.return_value = _api_ok("allow")
         with patch.object(hh, "_audit_log"):
-            with patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+            with patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
                 hh.handle_before_submit_prompt({"session_id": "s", "prompt": "clean prompt"})
         assert capsys.readouterr().out == ""
 
@@ -106,7 +106,7 @@ class TestPromptResponse:
     def test_blocked_prompt_is_not_logged(self, mock_run):
         mock_run.return_value = _api_ok("deny", "blocked")
         with patch.object(hh, "_audit_log") as mock_log:
-            with patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+            with patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
                 hh.handle_before_submit_prompt({"session_id": "s", "prompt": "bad"})
         mock_log.assert_not_called()
 
@@ -114,7 +114,7 @@ class TestPromptResponse:
     def test_allowed_prompt_is_logged(self, mock_run):
         mock_run.return_value = _api_ok("allow")
         with patch.object(hh, "_audit_log") as mock_log:
-            with patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+            with patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
                 hh.handle_before_submit_prompt({"session_id": "s", "prompt": "good"})
         mock_log.assert_called_once()
         log_entry = mock_log.call_args[0][0]
@@ -130,7 +130,7 @@ class TestPromptErrorPaths:
     def test_no_api_key_logs_and_no_output(self, capsys):
         with patch.object(hh, "_audit_log") as mock_log:
             with patch.dict("os.environ", {}, clear=True):
-                os.environ.pop("UNBOUND_API_KEY", None)
+                os.environ.pop("UNBOUND_CURSOR_API_KEY", None)
                 hh.handle_before_submit_prompt({"session_id": "s", "prompt": "hi"})
         assert capsys.readouterr().out == ""
         mock_log.assert_called_once()
@@ -139,7 +139,7 @@ class TestPromptErrorPaths:
     def test_api_500_allows_and_logs(self, mock_run, capsys):
         mock_run.return_value = _api_fail()
         with patch.object(hh, "_audit_log") as mock_log:
-            with patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+            with patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
                 hh.handle_before_submit_prompt({"session_id": "s", "prompt": "hi"})
         assert capsys.readouterr().out == ""
         mock_log.assert_called_once()
@@ -147,7 +147,7 @@ class TestPromptErrorPaths:
     @patch("subprocess.run", side_effect=Exception("timeout"))
     def test_timeout_allows_and_logs(self, mock_run, capsys):
         with patch.object(hh, "_audit_log") as mock_log:
-            with patch.dict("os.environ", {"UNBOUND_API_KEY": "key"}):
+            with patch.dict("os.environ", {"UNBOUND_CURSOR_API_KEY": "key"}):
                 hh.handle_before_submit_prompt({"session_id": "s", "prompt": "hi"})
         assert capsys.readouterr().out == ""
         mock_log.assert_called_once()

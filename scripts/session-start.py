@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cursor sessionStart hook — detects missing UNBOUND_API_KEY and injects setup context.
+"""Cursor sessionStart hook — detects missing UNBOUND_CURSOR_API_KEY and injects setup context.
 
 When the API key is missing, injects setup instructions into the AI's context
 via `additional_context` so the AI proactively guides the user through setup.
@@ -13,6 +13,11 @@ This script must always fail open — any exception outputs {"continue": true}.
 import json
 import os
 import sys
+from pathlib import Path
+
+# Resolve absolute path to setup.py based on this script's location
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+_SETUP_PY = _SCRIPTS_DIR / "setup.py"
 
 
 def main() -> None:
@@ -28,19 +33,21 @@ def main() -> None:
         print(json.dumps({"continue": True}))
         sys.exit(0)
 
-    api_key = os.getenv("UNBOUND_API_KEY")
+    api_key = os.getenv("UNBOUND_CURSOR_API_KEY")
 
     if not api_key:
+        setup_cmd = f"python3 {_SETUP_PY} --domain gateway.getunbound.ai"
         output = {
             "additional_context": (
-                "UNBOUND_API_KEY is not configured. The Unbound security plugin "
+                "UNBOUND_CURSOR_API_KEY is not configured. The Unbound security plugin "
                 "cannot enforce policies without it.\n\n"
-                "To set up, ask the user to run this command in their terminal:\n"
-                "  python3 scripts/setup.py --domain gateway.getunbound.ai\n\n"
-                "After setup completes, the user must restart Cursor for the key "
-                "to take effect.\n\n"
+                "To set up, run this exact command:\n"
+                f"  {setup_cmd}\n\n"
+                "This opens a browser for authentication and saves the key to the "
+                "user's shell RC file. After setup completes, the user must restart "
+                "Cursor for the key to take effect.\n\n"
                 "Proactively inform the user that Unbound setup is needed and offer "
-                "to guide them through the process."
+                "to run the setup command for them."
             ),
             "continue": True,
         }
