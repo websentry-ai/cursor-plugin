@@ -6,7 +6,7 @@ user-invocable: true
 
 # Unbound Setup
 
-You are helping the user configure the Unbound AI plugin for Cursor. Follow these steps precisely and in order. The API key is handled entirely by the setup script — you never see, store, or echo it.
+You are helping the user configure the Unbound AI plugin for Cursor. The setup script handles everything: browser OAuth, API key persistence, downloading hooks from the public repo, and restarting Cursor.
 
 ---
 
@@ -27,18 +27,30 @@ echo "${UNBOUND_CURSOR_API_KEY:0:8}..."
 
 ---
 
-## Step 2 — Authenticate via browser
+## Step 2 — Run the setup script
 
-Run the setup script — it handles everything (local callback server, browser auth, key persistence to RC file):
+Run the setup script — it handles browser auth, API key persistence, downloading hooks, and restarting Cursor:
 
 ```bash
 python3 "${CURSOR_PLUGIN_ROOT}/scripts/setup.py" --domain gateway.getunbound.ai
 ```
 
-The script prints progress messages to stdout. Check the exit code:
+The script will:
+1. Open a browser for authentication
+2. Save `UNBOUND_CURSOR_API_KEY` to the user's shell RC file
+3. Download `hooks.json` to `~/.cursor/hooks.json`
+4. Download `unbound.py` to `~/.cursor/hooks/unbound.py`
+5. Restart Cursor
 
-- **Exit code 0**: Setup succeeded. The script has persisted the key to the user's shell RC file.
+Check the exit code:
+- **Exit code 0**: Setup succeeded.
 - **Non-zero exit code**: Setup failed. Show the script's output to the user and offer to retry.
+
+To download/update hooks only (without re-authenticating):
+
+```bash
+python3 "${CURSOR_PLUGIN_ROOT}/scripts/setup.py" --hooks-only
+```
 
 **Security property:** The API key never appears in chat, bash commands, or terminal output. It exists only inside the setup script's process memory and the RC file on disk.
 
@@ -90,19 +102,14 @@ Print a summary like this (adapt `<RC_FILE>` to the actual RC file for the user'
 
 ```
 UNBOUND_CURSOR_API_KEY saved to <RC_FILE>
+Hooks downloaded to ~/.cursor/hooks/
 API connectivity verified (HTTP 200)
 Unbound plugin is active
 
-IMPORTANT: You must restart Cursor for hooks to use the new key.
-  Cursor hooks inherit the environment from when Cursor was launched,
-  so the key must be loaded BEFORE starting Cursor.
-
-  Close Cursor completely (Cmd+Q) and reopen it to pick up the new
-  environment variable.
-
 What happens next:
-  - Every tool use (Shell, Read, Write...) is checked against your Unbound policies
+  - Shell and MCP executions are checked against your Unbound policies
   - User prompts are scanned for DLP / NSFW / jailbreak guardrails
+  - File reads, edits, and agent responses are audited
   - Session data streams to your Unbound dashboard for analytics
 
 To view your policies and guardrails: https://app.getunbound.ai
@@ -112,7 +119,7 @@ If connectivity failed, end with:
 
 ```
 API unreachable — plugin installed but running in fail-open mode.
-    All tool uses will be allowed until connectivity is restored.
+    All actions will be allowed until connectivity is restored.
     Check your API key and network, then run /unbound-cursor:setup again.
 ```
 

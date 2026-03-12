@@ -4,15 +4,19 @@ Security, governance, and analytics for [Cursor](https://cursor.com) — powered
 
 ## What it does
 
-This plugin connects Cursor to the Unbound AI platform:
+This plugin connects Cursor to the Unbound AI platform via hooks downloaded from the [websentry-ai/setup](https://github.com/websentry-ai/setup) public repo:
 
 | Hook | What it enforces |
 |---|---|
-| **sessionStart** | Auto-detects missing API key and prompts setup |
-| **preToolUse** | Command policy — block or warn on dangerous tool invocations |
+| **beforeShellExecution** | Policy check before shell commands |
+| **beforeMCPExecution** | Policy check before MCP tool calls |
+| **afterShellExecution** | Audit logging for shell commands |
+| **afterMCPExecution** | Audit logging for MCP tool calls |
+| **afterFileEdit** | Audit logging for file edits |
+| **beforeReadFile** | Audit logging for file reads |
 | **beforeSubmitPrompt** | Guardrails — DLP, NSFW, and jailbreak detection on user prompts |
-| **postToolUse** | Audit logging — streams tool usage to the Unbound dashboard |
-| **sessionEnd** | Session analytics — sends the full conversation exchange on session end |
+| **afterAgentResponse** | Captures assistant responses for analytics |
+| **stop** | Session analytics — sends the full conversation exchange |
 
 All hooks **fail open**: if the API is unreachable or the key is missing, Cursor continues normally.
 
@@ -32,15 +36,15 @@ cd cursor-extension
 ./install.sh
 ```
 
-This single command installs hooks, opens your browser for authentication, and saves your API key. Restart Cursor after.
+This single command opens your browser for authentication, saves your API key, downloads hooks from the public repo, and restarts Cursor.
 
 ---
 
 ## Setup
 
-### Automatic (recommended)
+### Via skill (recommended)
 
-Start a new conversation in Cursor. If `UNBOUND_CURSOR_API_KEY` is not set, the AI will automatically detect it and run the setup script for you — browser opens, you authenticate, done.
+Run `/unbound-cursor:setup` in any Cursor conversation. The AI will walk you through the setup flow.
 
 ### Manual
 
@@ -50,7 +54,18 @@ Run in your terminal:
 python3 scripts/setup.py --domain gateway.getunbound.ai
 ```
 
-Then restart Cursor to pick up the new environment variable.
+This will:
+1. Open a browser for authentication
+2. Save `UNBOUND_CURSOR_API_KEY` to your shell RC file
+3. Download `hooks.json` to `~/.cursor/hooks.json`
+4. Download `unbound.py` to `~/.cursor/hooks/unbound.py`
+5. Restart Cursor
+
+To update hooks only (without re-authenticating):
+
+```bash
+python3 scripts/setup.py --hooks-only
+```
 
 ### Verify
 
@@ -84,7 +99,7 @@ Options:
 
 | Path | Contents |
 |---|---|
-| `~/.cursor/hooks/agent-audit.log` | Per-session audit trail (beforeSubmitPrompt, postToolUse) |
+| `~/.cursor/hooks/agent-audit.log` | Per-session audit trail |
 | `~/.cursor/hooks/error.log` | API errors (last 25 entries) |
 | `~/.unbound/logs/debug.jsonl` | Raw stdin from every hook event (for debugging) |
 | `~/.unbound/logs/offline-events.jsonl` | Exchanges that failed to send (replayed on reconnect) |
@@ -100,26 +115,20 @@ uninstall.sh               Clean uninstaller
   plugin.json              Plugin manifest
   marketplace.json         Marketplace catalog
 hooks/
-  hooks.json               Hook event configuration (5 hooks)
+  hooks.json               Plugin hook config (empty — hooks downloaded at setup)
 rules/
   setup-guide.mdc          On-demand setup/reconfigure rule
+skills/
+  setup/SKILL.md           /unbound-cursor:setup skill
+commands/
+  setup.md                 Setup command
 scripts/
-  hook-handler.py          Central hook dispatcher
-  session-start.py         sessionStart — API key detection + setup prompt
-  setup.py                 Browser OAuth setup script
-  lib/
-    adapter.py             Cursor ↔ Unbound schema translation
-    unbound.py             Unbound API helpers
+  setup.py                 Browser OAuth + hook download script
 enterprise/
   hooks.json.tmpl          MDM template for fleet enforcement
   README.md                Enterprise deployment guide
 tests/
-  test_adapter.py          Adapter unit tests
-  test_session_start.py    sessionStart hook tests
-  test_pretool.py          preToolUse hook tests
-  test_prompt.py           beforeSubmitPrompt tests
-  test_session.py          postToolUse + sessionEnd tests
-  test_sanity.py           Production readiness tests
+  test_setup.py            Setup script tests
   requirements.txt         pytest
 ```
 

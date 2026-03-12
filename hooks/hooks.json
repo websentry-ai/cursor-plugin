@@ -1,35 +1,4 @@
 {
   "version": 1,
-  "hooks": {
-    "sessionStart": [
-      {
-        "command": "python3 ${CURSOR_PLUGIN_ROOT}/scripts/session-start.py",
-        "timeout": 5
-      }
-    ],
-    "preToolUse": [
-      {
-        "command": "python3 ${CURSOR_PLUGIN_ROOT}/scripts/hook-handler.py preToolUse",
-        "timeout": 10
-      }
-    ],
-    "postToolUse": [
-      {
-        "command": "python3 ${CURSOR_PLUGIN_ROOT}/scripts/hook-handler.py postToolUse",
-        "timeout": 60
-      }
-    ],
-    "beforeSubmitPrompt": [
-      {
-        "command": "python3 ${CURSOR_PLUGIN_ROOT}/scripts/hook-handler.py beforeSubmitPrompt",
-        "timeout": 60
-      }
-    ],
-    "sessionEnd": [
-      {
-        "command": "python3 ${CURSOR_PLUGIN_ROOT}/scripts/hook-handler.py sessionEnd",
-        "timeout": 60
-      }
-    ]
-  }
+  "hooks": {}
 }
