@@ -4,7 +4,7 @@ description: Configure Unbound AI credentials and verify connectivity. Use for f
 
 # Unbound Setup
 
-You are helping the user configure the Unbound AI plugin for Cursor. The setup script handles everything: browser OAuth, API key persistence, downloading hooks from the public repo, and restarting Cursor.
+You are helping the user configure the Unbound AI plugin for Cursor. Hooks are bundled with the plugin and work immediately upon install. The setup script handles browser OAuth, API key persistence, and restarting Cursor.
 
 ---
 
@@ -27,7 +27,7 @@ echo "${UNBOUND_CURSOR_API_KEY:0:8}..."
 
 ## Step 2 — Run the setup script
 
-Run the setup script — it handles browser auth, API key persistence, downloading hooks, and restarting Cursor:
+Run the setup script — it handles browser auth, API key persistence, and restarting Cursor:
 
 ```bash
 python3 "${CURSOR_PLUGIN_ROOT}/scripts/setup.py" --domain gateway.getunbound.ai
@@ -36,19 +36,11 @@ python3 "${CURSOR_PLUGIN_ROOT}/scripts/setup.py" --domain gateway.getunbound.ai
 The script will:
 1. Open a browser for authentication
 2. Save `UNBOUND_CURSOR_API_KEY` to the user's shell RC file
-3. Download `hooks.json` to `~/.cursor/hooks.json`
-4. Download `unbound.py` to `~/.cursor/hooks/unbound.py`
-5. Restart Cursor
+3. Restart Cursor
 
 Check the exit code:
 - **Exit code 0**: Setup succeeded.
 - **Non-zero exit code**: Setup failed. Show the script's output to the user and offer to retry.
-
-To download/update hooks only (without re-authenticating):
-
-```bash
-python3 "${CURSOR_PLUGIN_ROOT}/scripts/setup.py" --hooks-only
-```
 
 **Security property:** The API key never appears in chat, bash commands, or terminal output. It exists only inside the setup script's process memory and the RC file on disk.
 
@@ -100,9 +92,8 @@ Print a summary:
 
 ```
 UNBOUND_CURSOR_API_KEY saved to <RC_FILE>
-Hooks downloaded to ~/.cursor/hooks/
 API connectivity verified (HTTP 200)
-Unbound plugin is active
+Unbound plugin is active — hooks are bundled and ready
 
 What happens next:
   - Shell and MCP executions are checked against your Unbound policies

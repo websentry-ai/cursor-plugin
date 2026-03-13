@@ -1,11 +1,11 @@
 ---
-description: Guide for setting up, reconfiguring, or troubleshooting the Unbound security plugin. Covers API key configuration, hooks download, connectivity verification, and restart instructions.
+description: Guide for setting up, reconfiguring, or troubleshooting the Unbound security plugin. Covers API key configuration, connectivity verification, and restart instructions.
 alwaysApply: false
 ---
 
 # Unbound Setup Guide
 
-You are helping the user configure the Unbound AI plugin for Cursor. Follow these steps precisely and in order. The setup script handles everything: browser auth, API key persistence, hooks download, and Cursor restart.
+You are helping the user configure the Unbound AI plugin for Cursor. Follow these steps precisely and in order. Hooks are bundled with the plugin and work immediately upon install. The setup script handles browser auth, API key persistence, and Cursor restart.
 
 ---
 
@@ -28,7 +28,7 @@ echo "${UNBOUND_CURSOR_API_KEY:0:8}..."
 
 ## Step 2 — Run the setup script
 
-The setup script handles everything: browser OAuth, API key persistence, downloading hooks from the public websentry-ai/setup repo, and restarting Cursor.
+The setup script handles browser OAuth, API key persistence, and restarting Cursor. Hooks are bundled with the plugin.
 
 ```bash
 python3 <PLUGIN_ROOT>/scripts/setup.py --domain gateway.getunbound.ai
@@ -39,19 +39,11 @@ For local clones, `<PLUGIN_ROOT>` is wherever you cloned the repo. For marketpla
 The script will:
 1. Open a browser for authentication
 2. Save `UNBOUND_CURSOR_API_KEY` to the user's shell RC file
-3. Download `hooks.json` to `~/.cursor/hooks.json`
-4. Download `unbound.py` to `~/.cursor/hooks/unbound.py`
-5. Restart Cursor
+3. Restart Cursor
 
 Check the exit code:
 - **Exit code 0**: Setup succeeded.
 - **Non-zero exit code**: Setup failed. Show the script's output to the user and offer to retry.
-
-To download hooks only (without re-authenticating):
-
-```bash
-python3 <PLUGIN_ROOT>/scripts/setup.py --hooks-only
-```
 
 ---
 
@@ -101,9 +93,8 @@ Print a summary:
 
 ```
 UNBOUND_CURSOR_API_KEY saved to <RC_FILE>
-Hooks downloaded to ~/.cursor/hooks/
 API connectivity verified (HTTP 200)
-Unbound plugin is active
+Unbound plugin is active — hooks are bundled and ready
 
 What happens next:
   - Shell and MCP executions are checked against your Unbound policies

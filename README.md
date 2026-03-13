@@ -4,7 +4,7 @@ Security, governance, and analytics for [Cursor](https://cursor.com) — powered
 
 ## What it does
 
-This plugin connects Cursor to the Unbound AI platform via hooks downloaded from the [websentry-ai/setup](https://github.com/websentry-ai/setup) public repo:
+This plugin connects Cursor to the Unbound AI platform via bundled hooks (sourced from [websentry-ai/setup](https://github.com/websentry-ai/setup)):
 
 | Hook | What it enforces |
 |---|---|
@@ -36,7 +36,7 @@ cd cursor-extension
 ./install.sh
 ```
 
-This single command opens your browser for authentication, saves your API key, downloads hooks from the public repo, and restarts Cursor.
+This single command opens your browser for authentication, saves your API key, and restarts Cursor. Hooks are bundled with the plugin and work immediately.
 
 ---
 
@@ -57,15 +57,7 @@ python3 scripts/setup.py --domain gateway.getunbound.ai
 This will:
 1. Open a browser for authentication
 2. Save `UNBOUND_CURSOR_API_KEY` to your shell RC file
-3. Download `hooks.json` to `~/.cursor/hooks.json`
-4. Download `unbound.py` to `~/.cursor/hooks/unbound.py`
-5. Restart Cursor
-
-To update hooks only (without re-authenticating):
-
-```bash
-python3 scripts/setup.py --hooks-only
-```
+3. Restart Cursor
 
 ### Verify
 
@@ -115,7 +107,8 @@ uninstall.sh               Clean uninstaller
   plugin.json              Plugin manifest
   marketplace.json         Marketplace catalog
 hooks/
-  hooks.json               Plugin hook config (empty — hooks downloaded at setup)
+  hooks.json               Plugin hook config (9 lifecycle hooks)
+  unbound.py               Hook processor (handles all 9 events)
 rules/
   setup-guide.mdc          On-demand setup/reconfigure rule
 skills/
@@ -123,7 +116,7 @@ skills/
 commands/
   setup.md                 Setup command
 scripts/
-  setup.py                 Browser OAuth + hook download script
+  setup.py                 Browser OAuth + API key setup script
 enterprise/
   hooks.json.tmpl          MDM template for fleet enforcement
   README.md                Enterprise deployment guide

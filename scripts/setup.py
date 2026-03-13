@@ -19,9 +19,6 @@ import socketserver
 import webbrowser
 
 
-HOOKS_URL = "https://raw.githubusercontent.com/websentry-ai/setup/refs/heads/main/cursor/hooks.json"
-SCRIPT_URL = "https://raw.githubusercontent.com/websentry-ai/setup/refs/heads/main/cursor/unbound.py"
-
 DEBUG = False
 
 
@@ -337,52 +334,6 @@ def run_one_shot_callback_server(frontend_url: str) -> Optional[Dict[str, any]]:
         return None
 
 
-def download_file(url: str, dest_path: Path) -> bool:
-    """Download a file from a URL to a local path using curl."""
-    try:
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-        debug_print(f"Downloading {url} to {dest_path}")
-        result = subprocess.run(
-            ["curl", "-fsSL", "-o", str(dest_path), url],
-            capture_output=True,
-            timeout=30,
-        )
-        if result.returncode == 0:
-            debug_print(f"Downloaded successfully: {dest_path}")
-            return True
-        error = result.stderr.decode("utf-8", errors="ignore").strip()
-        print(f"Failed to download {url}: {error}")
-        return False
-    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        print(f"Failed to download {url}: {e}")
-        return False
-
-
-def setup_hooks() -> bool:
-    """Download hooks.json and unbound.py from the public websentry-ai/setup repo."""
-    hooks_json = Path.home() / ".cursor" / "hooks.json"
-    hooks_dir = Path.home() / ".cursor" / "hooks"
-    script_path = hooks_dir / "unbound.py"
-
-    print("\nDownloading hooks configuration...")
-    if not download_file(HOOKS_URL, hooks_json):
-        return False
-    print("hooks.json installed")
-
-    print("Downloading unbound.py hook script...")
-    if not download_file(SCRIPT_URL, script_path):
-        return False
-    print("unbound.py installed")
-
-    try:
-        os.chmod(script_path, script_path.stat().st_mode | 0o111)
-        debug_print("Made unbound.py executable")
-    except Exception as e:
-        debug_print(f"Could not make script executable: {e}")
-
-    return True
-
-
 def restart_cursor() -> bool:
     """Attempt to gracefully restart Cursor IDE."""
     system = platform.system().lower()
@@ -455,23 +406,6 @@ def clear_setup() -> None:
     else:
         print("Failed to remove UNBOUND_CURSOR_API_KEY")
 
-    # Remove downloaded hooks
-    hooks_json = Path.home() / ".cursor" / "hooks.json"
-    if hooks_json.exists():
-        try:
-            hooks_json.unlink()
-            print(f"Removed {hooks_json}")
-        except Exception as e:
-            print(f"Failed to remove {hooks_json}: {e}")
-
-    script_path = Path.home() / ".cursor" / "hooks" / "unbound.py"
-    if script_path.exists():
-        try:
-            script_path.unlink()
-            print(f"Removed {script_path}")
-        except Exception as e:
-            print(f"Failed to remove {script_path}: {e}")
-
     print("\n" + "=" * 60)
     print("Clear Complete!")
     print("=" * 60)
@@ -484,7 +418,6 @@ def main():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--domain", dest="domain", help="Base frontend URL (e.g., gateway.getunbound.ai)")
     parser.add_argument("--clear", action="store_true", help="Undo all changes made by the setup script")
-    parser.add_argument("--hooks-only", action="store_true", help="Download hooks only, skip browser authentication")
     parser.add_argument("--debug", action="store_true", help="Show detailed debug information")
     args, _ = parser.parse_known_args()
 
@@ -494,18 +427,6 @@ def main():
 
     if args.clear:
         clear_setup()
-        return
-
-    if args.hooks_only:
-        print("=" * 60)
-        print("Cursor - Hooks Setup")
-        print("=" * 60)
-        if not setup_hooks():
-            print("\nFailed to setup hooks.")
-            sys.exit(1)
-        print("\n" + "=" * 60)
-        print("Hooks installed!")
-        print("=" * 60)
         return
 
     if not args.domain:
@@ -551,11 +472,6 @@ def main():
         print(f"Failed to configure UNBOUND_CURSOR_API_KEY: {message}")
         sys.exit(1)
     debug_print("UNBOUND_CURSOR_API_KEY set successfully")
-
-    # Download hooks and unbound.py from public repo
-    if not setup_hooks():
-        print("\nFailed to setup hooks.")
-        sys.exit(1)
 
     # Final instructions
     print("\n" + "=" * 60)
