@@ -418,35 +418,35 @@ def _trim_error_log(cutoff_iso):
 def process_stop_event(generation_id, api_key=None):
     """Process stop event: convert to LLM format and send to API."""
     logs = load_existing_logs()
-    
+
     # Group events
     grouped = group_events_by_generation(logs)
-    
+
     # Find and process the generation with stop event
     for conversation_id, generations in grouped.items():
         if generation_id in generations:
             events = generations[generation_id]
-            
+
             # Check if this generation has a stop event
             has_stop = any(
                 log.get('event', {}).get('hook_event_name') == 'stop'
                 for log in events
             )
-            
+
             if has_stop:
                 # Build LLM exchange
                 exchange = build_llm_exchange(events, api_key)
-                
+
                 if exchange:
                     # Send to API
                     send_to_api(exchange, api_key)
-                
+
                 # Remove this generation's logs from agent-audit.log
                 remaining_logs = [
                     log for log in logs
                     if log.get('event', {}).get('generation_id') != generation_id
                 ]
-                
+
                 save_logs(remaining_logs)
                 break
 

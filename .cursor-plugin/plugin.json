@@ -1,12 +1,12 @@
 {
   "name": "unbound-cursor",
+  "displayName": "Unbound Cursor",
   "version": "1.0.0",
   "description": "Use Cursor without fear of data leakage. Unbound enforces command policies, DLP and jailbreak guardrails, and streams session analytics to your security dashboard — all with zero-latency fail-open design.",
   "author": {
     "name": "Unbound Security",
     "url": "https://getunbound.ai"
   },
-  "repository": "https://github.com/websentry-ai/cursor-extension",
   "license": "MIT",
   "keywords": [
     "security",
@@ -14,9 +14,5 @@
     "dlp",
     "guardrails",
     "enterprise"
-  ],
-  "hooks": "hooks/hooks.json",
-  "rules": "./rules/",
-  "skills": "./skills/",
-  "commands": "./commands/"
+  ]
 }
