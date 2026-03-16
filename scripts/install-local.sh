@@ -27,14 +27,16 @@ if [[ "${1:-}" == "--remove" ]]; then
     # Remove from cache
     rm -rf "$CACHE_DIR"
 
-    # Remove from installed_plugins.json
+    # Remove from installed_plugins.json (pass paths via env to avoid injection)
     if [ -f "$INSTALLED_JSON" ]; then
-        python3 -c "
-import json, sys
-with open('$INSTALLED_JSON') as f:
+        _INSTALLED_JSON="$INSTALLED_JSON" _PLUGIN_KEY="$PLUGIN_KEY" python3 -c "
+import json, os
+path = os.environ['_INSTALLED_JSON']
+key = os.environ['_PLUGIN_KEY']
+with open(path) as f:
     data = json.load(f)
-data.get('plugins', {}).pop('$PLUGIN_KEY', None)
-with open('$INSTALLED_JSON', 'w') as f:
+data.get('plugins', {}).pop(key, None)
+with open(path, 'w') as f:
     json.dump(data, f, indent=2)
 print('Removed from installed_plugins.json')
 "
@@ -42,12 +44,14 @@ print('Removed from installed_plugins.json')
 
     # Remove from settings.json
     if [ -f "$SETTINGS_JSON" ]; then
-        python3 -c "
-import json
-with open('$SETTINGS_JSON') as f:
+        _SETTINGS_JSON="$SETTINGS_JSON" _PLUGIN_KEY="$PLUGIN_KEY" python3 -c "
+import json, os
+path = os.environ['_SETTINGS_JSON']
+key = os.environ['_PLUGIN_KEY']
+with open(path) as f:
     data = json.load(f)
-data.get('enabledPlugins', {}).pop('$PLUGIN_KEY', None)
-with open('$SETTINGS_JSON', 'w') as f:
+data.get('enabledPlugins', {}).pop(key, None)
+with open(path, 'w') as f:
     json.dump(data, f, indent=2)
 print('Removed from settings.json')
 "
@@ -72,13 +76,17 @@ cp -R "$PLUGIN_SOURCE/commands" "$CACHE_DIR/"
 cp -R "$PLUGIN_SOURCE/scripts" "$CACHE_DIR/"
 echo "Copied to $CACHE_DIR"
 
-# 2. Register in installed_plugins.json
+# 2. Register in installed_plugins.json (pass paths via env to avoid injection)
 mkdir -p "$(dirname "$INSTALLED_JSON")"
-python3 -c "
+_INSTALLED_JSON="$INSTALLED_JSON" _PLUGIN_KEY="$PLUGIN_KEY" _CACHE_DIR="$CACHE_DIR" _PLUGIN_VERSION="$PLUGIN_VERSION" python3 -c "
 import json, os
 from datetime import datetime, timezone
 
-path = '$INSTALLED_JSON'
+path = os.environ['_INSTALLED_JSON']
+key = os.environ['_PLUGIN_KEY']
+cache_dir = os.environ['_CACHE_DIR']
+version = os.environ['_PLUGIN_VERSION']
+
 if os.path.exists(path):
     with open(path) as f:
         data = json.load(f)
@@ -86,10 +94,10 @@ else:
     data = {'version': 2, 'plugins': {}}
 
 now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
-data['plugins']['$PLUGIN_KEY'] = [{
+data['plugins'][key] = [{
     'scope': 'user',
-    'installPath': '$CACHE_DIR',
-    'version': '$PLUGIN_VERSION',
+    'installPath': cache_dir,
+    'version': version,
     'installedAt': now,
     'lastUpdated': now,
 }]
@@ -100,10 +108,12 @@ print('Registered in installed_plugins.json')
 "
 
 # 3. Enable in settings.json
-python3 -c "
+_SETTINGS_JSON="$SETTINGS_JSON" _PLUGIN_KEY="$PLUGIN_KEY" python3 -c "
 import json, os
 
-path = '$SETTINGS_JSON'
+path = os.environ['_SETTINGS_JSON']
+key = os.environ['_PLUGIN_KEY']
+
 if os.path.exists(path):
     with open(path) as f:
         data = json.load(f)
@@ -113,7 +123,7 @@ else:
 if 'enabledPlugins' not in data:
     data['enabledPlugins'] = {}
 
-data['enabledPlugins']['$PLUGIN_KEY'] = True
+data['enabledPlugins'][key] = True
 
 with open(path, 'w') as f:
     json.dump(data, f, indent=2)

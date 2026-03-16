@@ -142,10 +142,19 @@ def set_env_var_on_unix(var_name: str, value: str) -> bool:
     debug_print(f"Writing to shell file: {rc_file}")
     export_line = f"export {var_name}={shlex.quote(value)}"
 
-    # append_to_file returns False for both "already present" (idempotent success)
-    # and write errors (logged by append_to_file). Either way the desired state is
-    # either already achieved or was attempted, so we return True.
-    append_to_file(rc_file, export_line)
+    result = append_to_file(rc_file, export_line)
+    # append_to_file returns False for "already present" (idempotent success)
+    # or on write error (logged by append_to_file). Check if the line is now
+    # in the file to distinguish success from failure.
+    if not result:
+        # Line already present — that's fine
+        try:
+            with open(rc_file, "r", encoding="utf-8") as f:
+                if export_line in f.read():
+                    return True
+        except Exception:
+            pass
+        return False
     return True
 
 
