@@ -357,6 +357,9 @@ def restart_cursor() -> bool:
 
         elif system == "linux":
             print("\nRestarting Cursor IDE...")
+            subprocess.run(["pkill", "cursor"], capture_output=True, timeout=5)
+            time.sleep(2)
+            # Force kill if still running
             subprocess.run(["pkill", "-9", "cursor"], capture_output=True, timeout=5)
             time.sleep(1)
             proc = subprocess.Popen(
@@ -459,8 +462,10 @@ def main():
         print("\nNo api_key found in callback. Exiting.")
         sys.exit(1)
 
-    if "'" in api_key:
-        print("\nReceived API key contains an invalid character ('). Exiting.")
+    # Validate API key format: reject control characters and whitespace
+    import re
+    if not re.match(r'^[A-Za-z0-9\-_.:]+$', api_key):
+        print("\nReceived API key contains invalid characters. Exiting.")
         sys.exit(1)
 
     print("API Key Verified")

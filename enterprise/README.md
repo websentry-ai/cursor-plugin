@@ -16,7 +16,7 @@ This directory contains the hooks template for enforcing the Unbound plugin acro
 
 ### 1. Deploy hooks.json
 
-Copy `hooks.json.tmpl` to the system path for your target OS and rename it to `hooks.json`.
+Copy `hooks.json.tmpl` to the system path for your target OS and rename it to `hooks.json`. The template references `${CURSOR_PLUGIN_ROOT}/hooks/unbound.py` — the single bundled hook processor that handles all 9 Cursor lifecycle events.
 
 macOS (run as root or via MDM):
 

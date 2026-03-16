@@ -16,9 +16,9 @@ PLUGIN_NAME="unbound-cursor"
 PLUGIN_KEY="${PLUGIN_NAME}@local"
 PLUGIN_VERSION="1.0.0"
 
-CACHE_DIR="$HOME/.claude/plugins/cache/local/${PLUGIN_NAME}/${PLUGIN_VERSION}"
-INSTALLED_JSON="$HOME/.claude/plugins/installed_plugins.json"
-SETTINGS_JSON="$HOME/.claude/settings.json"
+CACHE_DIR="$HOME/.cursor/plugins/cache/local/${PLUGIN_NAME}/${PLUGIN_VERSION}"
+INSTALLED_JSON="$HOME/.cursor/plugins/installed_plugins.json"
+SETTINGS_JSON="$HOME/.cursor/settings.json"
 
 # ── Uninstall ─────────────────────────────────────────────────
 if [[ "${1:-}" == "--remove" ]]; then

@@ -35,19 +35,22 @@ except Exception:
 
 def log_error(message):
     """Log error with timestamp to error.log, keeping only last 25 errors."""
-    timestamp = datetime.now().astimezone().isoformat().replace('+00:00', 'Z')
-    error_entry = f"{timestamp}: {message}\n"
-    
-    with open(ERROR_LOG, 'a', encoding='utf-8') as f:
-        f.write(error_entry)
-    
-    # Keep only last 25 errors
-    if ERROR_LOG.exists():
-        with open(ERROR_LOG, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-        if len(lines) > 25:
-            with open(ERROR_LOG, 'w', encoding='utf-8') as f:
-                f.writelines(lines[-25:])
+    try:
+        timestamp = datetime.now().astimezone().isoformat().replace('+00:00', 'Z')
+        error_entry = f"{timestamp}: {message}\n"
+
+        with open(ERROR_LOG, 'a', encoding='utf-8') as f:
+            f.write(error_entry)
+
+        # Keep only last 25 errors
+        if ERROR_LOG.exists():
+            with open(ERROR_LOG, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            if len(lines) > 25:
+                with open(ERROR_LOG, 'w', encoding='utf-8') as f:
+                    f.writelines(lines[-25:])
+    except Exception:
+        pass  # Never let error logging break the hook
 
 
 def load_existing_logs():
@@ -484,7 +487,7 @@ def main():
             response = process_user_prompt_submit(event, api_key)
 
             # If denied, transform response for Cursor format and exit
-            if response.get('decision') == 'deny':
+            if response.get('decision') in ('deny', 'block'):
                 cursor_response = {
                     'continue': False,
                     'user_message': response.get('reason', 'Prompt blocked by policy')
@@ -498,16 +501,17 @@ def main():
             'timestamp': timestamp,
             'event': event
         }
-        
-        # Append to audit log
-        append_to_audit_log(log_entry)
-        
-        # Handle interrupted requests (new generation in same conversation)
+
+        # Handle interrupted requests BEFORE appending, so the new generation_id
+        # is not yet in the log and cleanup can detect it as new
         if hook_event_name == 'beforeSubmitPrompt' and conversation_id and generation_id:
             logs = load_existing_logs()
             cleaned_logs = cleanup_interrupted_requests(logs, conversation_id, generation_id)
             if len(cleaned_logs) < len(logs):
                 save_logs(cleaned_logs)
+
+        # Append to audit log
+        append_to_audit_log(log_entry)
         
         # Process stop event
         if hook_event_name == 'stop' and generation_id:
@@ -521,7 +525,6 @@ def main():
     except Exception as e:
         # Log errors but still output {} to not break Cursor
         log_error(f"Exception in main: {str(e)}")
-        print("{}", file=sys.stderr)
         print(f"Error: {e}", file=sys.stderr)
         print("{}")
 
