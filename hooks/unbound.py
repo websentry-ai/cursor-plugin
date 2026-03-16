@@ -415,45 +415,40 @@ def _trim_error_log(cutoff_iso):
         pass
 
 
-def process_stop_event(conversation_id, generation_id=None, api_key=None):
-    """Process stop event: convert to LLM format and send to API.
-
-    Uses generation_id when available, falls back to conversation_id
-    (Cursor's stop hook only provides conversation_id, not generation_id).
-    """
+def process_stop_event(generation_id, api_key=None):
+    """Process stop event: convert to LLM format and send to API."""
     logs = load_existing_logs()
 
-    if generation_id:
-        # Prefer generation_id grouping when available
-        grouped = group_events_by_generation(logs)
-        for conv_id, generations in grouped.items():
-            if generation_id in generations:
-                events = generations[generation_id]
+    # Group events
+    grouped = group_events_by_generation(logs)
+
+    # Find and process the generation with stop event
+    for conversation_id, generations in grouped.items():
+        if generation_id in generations:
+            events = generations[generation_id]
+
+            # Check if this generation has a stop event
+            has_stop = any(
+                log.get('event', {}).get('hook_event_name') == 'stop'
+                for log in events
+            )
+
+            if has_stop:
+                # Build LLM exchange
                 exchange = build_llm_exchange(events, api_key)
+
                 if exchange:
+                    # Send to API
                     send_to_api(exchange, api_key)
+
+                # Remove this generation's logs from agent-audit.log
                 remaining_logs = [
                     log for log in logs
                     if log.get('event', {}).get('generation_id') != generation_id
                 ]
-                save_logs(remaining_logs)
-                return
 
-    # Fallback: use conversation_id to find all events for this conversation
-    if conversation_id:
-        events = [
-            log for log in logs
-            if log.get('event', {}).get('conversation_id') == conversation_id
-        ]
-        if events:
-            exchange = build_llm_exchange(events, api_key)
-            if exchange:
-                send_to_api(exchange, api_key)
-            remaining_logs = [
-                log for log in logs
-                if log.get('event', {}).get('conversation_id') != conversation_id
-            ]
-            save_logs(remaining_logs)
+                save_logs(remaining_logs)
+                break
 
 
 def main():
@@ -521,9 +516,10 @@ def main():
             if len(cleaned_logs) < len(logs):
                 save_logs(cleaned_logs)
         
-        # Process stop event (stop may not have generation_id, so use conversation_id)
-        if hook_event_name == 'stop':
-            process_stop_event(conversation_id, generation_id, api_key)
+        # Process stop event
+        if hook_event_name == 'stop' and generation_id:
+            process_stop_event(generation_id, api_key)
+            # Only cleanup after processing stop event to avoid race conditions
             cleanup_old_logs()
         
         # Output required by Cursor hooks

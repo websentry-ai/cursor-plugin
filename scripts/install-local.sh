@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Install the Unbound Cursor plugin locally into Cursor's plugin cache.
+# Install the Unbound Cursor plugin for local development.
 #
-# This simulates what the marketplace does: copies plugin files to the cache,
-# registers in installed_plugins.json, and enables in settings.json.
+# Cursor plugin discovery:
+#   - Plugin files:    ~/.cursor/plugins/<plugin-name>/
+#   - Registration:    ~/.claude/plugins/installed_plugins.json
+#   - Enabled flag:    ~/.claude/settings.json  (under enabledPlugins)
 #
 # Usage:
 #   ./scripts/install-local.sh           Install/update the plugin
@@ -16,18 +18,20 @@ PLUGIN_NAME="unbound-cursor"
 PLUGIN_KEY="${PLUGIN_NAME}@local"
 PLUGIN_VERSION="1.0.0"
 
-CACHE_DIR="$HOME/.cursor/plugins/cache/local/${PLUGIN_NAME}/${PLUGIN_VERSION}"
-INSTALLED_JSON="$HOME/.cursor/plugins/installed_plugins.json"
-SETTINGS_JSON="$HOME/.cursor/settings.json"
+# Plugin files live under ~/.cursor/plugins/<name>
+INSTALL_DIR="$HOME/.cursor/plugins/${PLUGIN_NAME}"
+# Cursor reads registration + enablement from ~/.claude/
+INSTALLED_JSON="$HOME/.claude/plugins/installed_plugins.json"
+SETTINGS_JSON="$HOME/.claude/settings.json"
 
 # ── Uninstall ─────────────────────────────────────────────────
 if [[ "${1:-}" == "--remove" ]]; then
     echo "Removing ${PLUGIN_KEY}..."
 
-    # Remove from cache
-    rm -rf "$CACHE_DIR"
+    # Remove plugin files
+    rm -rf "$INSTALL_DIR"
 
-    # Remove from installed_plugins.json (pass paths via env to avoid injection)
+    # Remove from installed_plugins.json
     if [ -f "$INSTALLED_JSON" ]; then
         _INSTALLED_JSON="$INSTALLED_JSON" _PLUGIN_KEY="$PLUGIN_KEY" python3 -c "
 import json, os
@@ -65,26 +69,26 @@ fi
 # ── Install ───────────────────────────────────────────────────
 echo "Installing ${PLUGIN_KEY} from ${PLUGIN_SOURCE}..."
 
-# 1. Copy plugin files to cache
-rm -rf "$CACHE_DIR"
-mkdir -p "$CACHE_DIR"
-cp -R "$PLUGIN_SOURCE/.cursor-plugin" "$CACHE_DIR/"
-cp -R "$PLUGIN_SOURCE/hooks" "$CACHE_DIR/"
-cp -R "$PLUGIN_SOURCE/rules" "$CACHE_DIR/"
-cp -R "$PLUGIN_SOURCE/skills" "$CACHE_DIR/"
-cp -R "$PLUGIN_SOURCE/commands" "$CACHE_DIR/"
-cp -R "$PLUGIN_SOURCE/scripts" "$CACHE_DIR/"
-echo "Copied to $CACHE_DIR"
+# 1. Copy plugin files to ~/.cursor/plugins/<name>/
+rm -rf "$INSTALL_DIR"
+mkdir -p "$INSTALL_DIR"
+cp -R "$PLUGIN_SOURCE/.cursor-plugin" "$INSTALL_DIR/"
+cp -R "$PLUGIN_SOURCE/hooks" "$INSTALL_DIR/"
+cp -R "$PLUGIN_SOURCE/rules" "$INSTALL_DIR/"
+cp -R "$PLUGIN_SOURCE/skills" "$INSTALL_DIR/"
+cp -R "$PLUGIN_SOURCE/commands" "$INSTALL_DIR/"
+cp -R "$PLUGIN_SOURCE/scripts" "$INSTALL_DIR/"
+echo "Copied to $INSTALL_DIR"
 
-# 2. Register in installed_plugins.json (pass paths via env to avoid injection)
+# 2. Register in ~/.claude/plugins/installed_plugins.json
 mkdir -p "$(dirname "$INSTALLED_JSON")"
-_INSTALLED_JSON="$INSTALLED_JSON" _PLUGIN_KEY="$PLUGIN_KEY" _CACHE_DIR="$CACHE_DIR" _PLUGIN_VERSION="$PLUGIN_VERSION" python3 -c "
+_INSTALLED_JSON="$INSTALLED_JSON" _PLUGIN_KEY="$PLUGIN_KEY" _INSTALL_DIR="$INSTALL_DIR" _PLUGIN_VERSION="$PLUGIN_VERSION" python3 -c "
 import json, os
 from datetime import datetime, timezone
 
 path = os.environ['_INSTALLED_JSON']
 key = os.environ['_PLUGIN_KEY']
-cache_dir = os.environ['_CACHE_DIR']
+install_dir = os.environ['_INSTALL_DIR']
 version = os.environ['_PLUGIN_VERSION']
 
 if os.path.exists(path):
@@ -96,7 +100,7 @@ else:
 now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
 data['plugins'][key] = [{
     'scope': 'user',
-    'installPath': cache_dir,
+    'installPath': install_dir,
     'version': version,
     'installedAt': now,
     'lastUpdated': now,
@@ -107,7 +111,7 @@ with open(path, 'w') as f:
 print('Registered in installed_plugins.json')
 "
 
-# 3. Enable in settings.json
+# 3. Enable in ~/.claude/settings.json
 _SETTINGS_JSON="$SETTINGS_JSON" _PLUGIN_KEY="$PLUGIN_KEY" python3 -c "
 import json, os
 
