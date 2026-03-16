@@ -17,5 +17,6 @@
   ],
   "hooks": "hooks/hooks.json",
   "rules": "./rules/",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "commands": "./commands/"
 }

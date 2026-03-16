@@ -16,7 +16,7 @@ This directory contains the hooks template for enforcing the Unbound plugin acro
 
 ### 1. Deploy hooks.json
 
-Copy `hooks.json.tmpl` to the system path for your target OS and rename it to `hooks.json`.
+Copy `hooks.json.tmpl` to the system path for your target OS and rename it to `hooks.json`. The template references `${CURSOR_PLUGIN_ROOT}/hooks/unbound.py` — the single bundled hook processor that handles all 9 Cursor lifecycle events.
 
 macOS (run as root or via MDM):
 
@@ -32,9 +32,9 @@ mkdir -p /etc/cursor
 cp hooks.json.tmpl /etc/cursor/hooks.json
 ```
 
-### 2. Set UNBOUND_API_KEY for each user
+### 2. Set UNBOUND_CURSOR_API_KEY for each user
 
-The plugin reads `UNBOUND_API_KEY` from the environment. This must be set per user.
+The plugin reads `UNBOUND_CURSOR_API_KEY` from the environment. This must be set per user.
 
 **Option A — MDM-issued device API key (recommended)**
 
@@ -54,7 +54,7 @@ Set a single key for all users via a login script or MDM configuration profile:
 
 ```bash
 # /etc/profile.d/unbound.sh  (Linux)
-export UNBOUND_API_KEY="<YOUR_KEY>"
+export UNBOUND_CURSOR_API_KEY="<YOUR_KEY>"
 ```
 
 macOS: deploy a Configuration Profile (`.mobileconfig`) that sets the env var, or add the export to `/etc/zshenv`.
@@ -74,8 +74,8 @@ This approach is simpler than MDM but requires a Cursor Teams or Enterprise subs
 
 On an enrolled machine, open Cursor and start a new conversation. The AI should either:
 
-- Report that Unbound is active (if `UNBOUND_API_KEY` is set)
-- Prompt the user to run setup (if `UNBOUND_API_KEY` is missing)
+- Report that Unbound is active (if `UNBOUND_CURSOR_API_KEY` is set)
+- Prompt the user to run setup (if `UNBOUND_CURSOR_API_KEY` is missing)
 
 Test policy enforcement:
 

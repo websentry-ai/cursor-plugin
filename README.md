@@ -4,15 +4,19 @@ Security, governance, and analytics for [Cursor](https://cursor.com) — powered
 
 ## What it does
 
-This plugin connects Cursor to the Unbound AI platform:
+This plugin connects Cursor to the Unbound AI platform via bundled hooks (sourced from [websentry-ai/setup](https://github.com/websentry-ai/setup)):
 
 | Hook | What it enforces |
 |---|---|
-| **sessionStart** | Auto-detects missing API key and prompts setup |
-| **preToolUse** | Command policy — block or warn on dangerous tool invocations |
+| **beforeShellExecution** | Policy check before shell commands |
+| **beforeMCPExecution** | Policy check before MCP tool calls |
+| **afterShellExecution** | Audit logging for shell commands |
+| **afterMCPExecution** | Audit logging for MCP tool calls |
+| **afterFileEdit** | Audit logging for file edits |
+| **beforeReadFile** | Audit logging for file reads |
 | **beforeSubmitPrompt** | Guardrails — DLP, NSFW, and jailbreak detection on user prompts |
-| **postToolUse** | Audit logging — streams tool usage to the Unbound dashboard |
-| **sessionEnd** | Session analytics — sends the full conversation exchange on session end |
+| **afterAgentResponse** | Captures assistant responses for analytics |
+| **stop** | Session analytics — sends the full conversation exchange |
 
 All hooks **fail open**: if the API is unreachable or the key is missing, Cursor continues normally.
 
@@ -28,16 +32,19 @@ Search for **Unbound** in the Cursor marketplace panel, or visit [cursor.com/mar
 
 ```bash
 git clone https://github.com/websentry-ai/cursor-extension.git
-# Install via Cursor's plugin settings
+cd cursor-extension
+./install.sh
 ```
+
+This single command opens your browser for authentication, saves your API key, and restarts Cursor. Hooks are bundled with the plugin and work immediately.
 
 ---
 
 ## Setup
 
-### Automatic (recommended)
+### Via skill (recommended)
 
-Start a new conversation in Cursor. If `UNBOUND_API_KEY` is not set, the AI will automatically prompt you to run setup.
+Run `/unbound-cursor:setup` in any Cursor conversation. The AI will walk you through the setup flow.
 
 ### Manual
 
@@ -47,7 +54,10 @@ Run in your terminal:
 python3 scripts/setup.py --domain gateway.getunbound.ai
 ```
 
-Then restart Cursor to pick up the new environment variable.
+This will:
+1. Open a browser for authentication
+2. Save `UNBOUND_CURSOR_API_KEY` to your shell RC file
+3. Restart Cursor
 
 ### Verify
 
@@ -64,7 +74,7 @@ After setup, test with:
 For fleet deployment where users cannot disable the plugin, see [`enterprise/README.md`](enterprise/README.md).
 
 Options:
-1. **MDM**: Deploy `hooks.json` to the system-wide Cursor path + provision `UNBOUND_API_KEY` per device
+1. **MDM**: Deploy `hooks.json` to the system-wide Cursor path + provision `UNBOUND_CURSOR_API_KEY` per device
 2. **Team Marketplace**: Import the plugin repo in your Cursor Team Dashboard and mark as "required"
 
 ---
@@ -73,7 +83,7 @@ Options:
 
 | Variable | Description |
 |---|---|
-| `UNBOUND_API_KEY` | Bearer token for the Unbound API. Get one at https://app.getunbound.ai > Settings > API Keys |
+| `UNBOUND_CURSOR_API_KEY` | Bearer token for the Unbound API. Get one at https://app.getunbound.ai > Settings > API Keys |
 
 ---
 
@@ -81,7 +91,7 @@ Options:
 
 | Path | Contents |
 |---|---|
-| `~/.cursor/hooks/agent-audit.log` | Per-session audit trail (beforeSubmitPrompt, postToolUse) |
+| `~/.cursor/hooks/agent-audit.log` | Per-session audit trail |
 | `~/.cursor/hooks/error.log` | API errors (last 25 entries) |
 | `~/.unbound/logs/debug.jsonl` | Raw stdin from every hook event (for debugging) |
 | `~/.unbound/logs/offline-events.jsonl` | Exchanges that failed to send (replayed on reconnect) |
@@ -91,30 +101,27 @@ Options:
 ## Project structure
 
 ```
+install.sh                 Single-command installer
+uninstall.sh               Clean uninstaller
 .cursor-plugin/
   plugin.json              Plugin manifest
   marketplace.json         Marketplace catalog
 hooks/
-  hooks.json               Hook event configuration (5 hooks)
+  hooks.json               Plugin hook config (9 lifecycle hooks)
+  unbound.py               Hook processor (handles all 9 events)
 rules/
   setup-guide.mdc          On-demand setup/reconfigure rule
+skills/
+  setup/SKILL.md           /unbound-cursor:setup skill
+commands/
+  setup.md                 Setup command
 scripts/
-  hook-handler.py          Central hook dispatcher
-  session-start.py         sessionStart — API key detection + setup prompt
-  setup.py                 Browser OAuth setup script
-  lib/
-    adapter.py             Cursor ↔ Unbound schema translation
-    unbound.py             Unbound API helpers
+  setup.py                 Browser OAuth + API key setup script
 enterprise/
   hooks.json.tmpl          MDM template for fleet enforcement
   README.md                Enterprise deployment guide
 tests/
-  test_adapter.py          Adapter unit tests
-  test_session_start.py    sessionStart hook tests
-  test_pretool.py          preToolUse hook tests
-  test_prompt.py           beforeSubmitPrompt tests
-  test_session.py          postToolUse + sessionEnd tests
-  test_sanity.py           Production readiness tests
+  test_setup.py            Setup script tests
   requirements.txt         pytest
 ```
 
@@ -127,8 +134,11 @@ tests/
 pip install pytest
 python3 -m pytest tests/ -v
 
-# Install locally
-# Use Cursor's plugin settings to add from local path
+# Install locally for testing
+./install.sh
+
+# Uninstall
+./uninstall.sh
 ```
 
 ---

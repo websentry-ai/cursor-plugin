@@ -8,6 +8,7 @@ import platform
 import shlex
 import subprocess
 import sys
+import time
 import urllib.parse
 from pathlib import Path
 from typing import Tuple, Optional, Dict
@@ -141,10 +142,19 @@ def set_env_var_on_unix(var_name: str, value: str) -> bool:
     debug_print(f"Writing to shell file: {rc_file}")
     export_line = f"export {var_name}={shlex.quote(value)}"
 
-    # append_to_file returns False for both "already present" (idempotent success)
-    # and write errors (logged by append_to_file). Either way the desired state is
-    # either already achieved or was attempted, so we return True.
-    append_to_file(rc_file, export_line)
+    result = append_to_file(rc_file, export_line)
+    # append_to_file returns False for "already present" (idempotent success)
+    # or on write error (logged by append_to_file). Check if the line is now
+    # in the file to distinguish success from failure.
+    if not result:
+        # Line already present — that's fine
+        try:
+            with open(rc_file, "r", encoding="utf-8") as f:
+                if export_line in f.read():
+                    return True
+        except Exception:
+            pass
+        return False
     return True
 
 
@@ -304,8 +314,13 @@ def run_one_shot_callback_server(frontend_url: str) -> Optional[Dict[str, any]]:
         thread.start()
 
         encoded_callback = urllib.parse.quote(callback_url, safe="")
-        target_url = f"{frontend_url.rstrip('/')}/automations/api-key-callback?callback_url={encoded_callback}&app_type=default"
-        webbrowser.open(target_url)
+        target_url = f"{frontend_url.rstrip('/')}/automations/api-key-callback?callback_url={encoded_callback}&app_type=cursor"
+        # Use macOS `open` directly to avoid osascript errors with Chrome,
+        # fall back to webbrowser module on other platforms.
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", target_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            webbrowser.open(target_url)
         print("Opening browser...")
         print("If browser doesn't open automatically, open this link:")
         print(target_url)
@@ -328,18 +343,80 @@ def run_one_shot_callback_server(frontend_url: str) -> Optional[Dict[str, any]]:
         return None
 
 
+def restart_cursor() -> bool:
+    """Attempt to gracefully restart Cursor IDE."""
+    system = platform.system().lower()
+
+    try:
+        if system == "darwin":
+            print("\nRestarting Cursor IDE...")
+            result = subprocess.run(
+                ["osascript", "-e", 'tell application "Cursor" to quit'],
+                capture_output=True, timeout=5,
+            )
+            if result.returncode != 0:
+                subprocess.run(["killall", "Cursor"], capture_output=True, timeout=5)
+            time.sleep(2)
+            result = subprocess.run(["open", "-a", "Cursor"], capture_output=True, timeout=5)
+            if result.returncode == 0:
+                print("Cursor restarted")
+                return True
+            print("Please restart Cursor manually.")
+            return False
+
+        elif system == "linux":
+            print("\nRestarting Cursor IDE...")
+            subprocess.run(["pkill", "cursor"], capture_output=True, timeout=5)
+            time.sleep(2)
+            # Force kill if still running
+            subprocess.run(["pkill", "-9", "cursor"], capture_output=True, timeout=5)
+            time.sleep(1)
+            proc = subprocess.Popen(
+                ["cursor"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            time.sleep(0.5)
+            if proc.poll() is None:
+                print("Cursor restarted")
+                return True
+            print("Please restart Cursor manually.")
+            return False
+
+        elif system == "windows":
+            print("\nRestarting Cursor IDE...")
+            subprocess.run(
+                ["taskkill", "/F", "/IM", "Cursor.exe"],
+                capture_output=True, timeout=5,
+            )
+            time.sleep(1)
+            proc = subprocess.Popen(
+                ["start", "cursor"], shell=True,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            time.sleep(0.5)
+            if proc.poll() is None or proc.returncode == 0:
+                print("Cursor restarted")
+                return True
+            print("Please restart Cursor manually.")
+            return False
+
+        return False
+    except (subprocess.TimeoutExpired, Exception):
+        print("Please restart Cursor manually.")
+        return False
+
+
 def clear_setup() -> None:
     """Undo all changes made by the setup script."""
     print("=" * 60)
     print("Cursor - Clearing Setup")
     print("=" * 60)
 
-    # Remove UNBOUND_API_KEY
-    success, _ = remove_env_var("UNBOUND_API_KEY")
+    # Remove UNBOUND_CURSOR_API_KEY
+    success, _ = remove_env_var("UNBOUND_CURSOR_API_KEY")
     if success:
-        print("Removed UNBOUND_API_KEY")
+        print("Removed UNBOUND_CURSOR_API_KEY")
     else:
-        print("Failed to remove UNBOUND_API_KEY")
+        print("Failed to remove UNBOUND_CURSOR_API_KEY")
 
     print("\n" + "=" * 60)
     print("Clear Complete!")
@@ -372,9 +449,9 @@ def main():
     print("Cursor - Environment Setup")
     print("=" * 60)
 
-    # Flush previously set UNBOUND_API_KEY so we can write a fresh one
+    # Flush previously set UNBOUND_CURSOR_API_KEY so we can write a fresh one
     try:
-        remove_env_var("UNBOUND_API_KEY")
+        remove_env_var("UNBOUND_CURSOR_API_KEY")
     except Exception:
         pass
 
@@ -394,28 +471,34 @@ def main():
         print("\nNo api_key found in callback. Exiting.")
         sys.exit(1)
 
-    if "'" in api_key:
-        print("\nReceived API key contains an invalid character ('). Exiting.")
+    # Validate API key format: reject control characters and whitespace
+    import re
+    if not re.match(r'^[A-Za-z0-9\-_.:]+$', api_key):
+        print("\nReceived API key contains invalid characters. Exiting.")
         sys.exit(1)
 
     print("API Key Verified")
     debug_print("API key verification successful")
 
-    debug_print("Setting UNBOUND_API_KEY environment variable...")
-    success, message = set_env_var("UNBOUND_API_KEY", api_key)
+    debug_print("Setting UNBOUND_CURSOR_API_KEY environment variable...")
+    success, message = set_env_var("UNBOUND_CURSOR_API_KEY", api_key)
     if not success:
-        print(f"Failed to configure UNBOUND_API_KEY: {message}")
+        print(f"Failed to configure UNBOUND_CURSOR_API_KEY: {message}")
         sys.exit(1)
-    debug_print("UNBOUND_API_KEY set successfully")
+    debug_print("UNBOUND_CURSOR_API_KEY set successfully")
 
     # Final instructions
     print("\n" + "=" * 60)
     print("Setup Complete!")
     print("=" * 60)
+
+    restart_cursor()
+
     rc_path = get_shell_rc_file()
     if rc_path is not None:
-        print(f"\nTo apply changes, restart Cursor.")
-        print(f"Or source the key in your terminal first:\n  source {rc_path}\n")
+        print(f"\nTo apply changes in your current terminal, run:")
+        print(f"  source {rc_path}")
+        print(f"\nOr open a new terminal.")
 
 if __name__ == "__main__":
     try:

@@ -1,11 +1,10 @@
 ---
-description: Guide for setting up, reconfiguring, or troubleshooting the Unbound security plugin. Covers API key configuration, connectivity verification, and restart instructions.
-alwaysApply: false
+description: Configure Unbound AI credentials and verify connectivity. Use for first-time setup, reconfiguration, or troubleshooting.
 ---
 
-# Unbound Setup Guide
+# Unbound Setup
 
-You are helping the user configure the Unbound AI plugin for Cursor. Follow these steps precisely and in order. Hooks are bundled with the plugin and work immediately upon install. The setup script handles browser auth, API key persistence, and Cursor restart.
+You are helping the user configure the Unbound AI plugin for Cursor. Hooks are bundled with the plugin and work immediately upon install. The setup script handles browser OAuth, API key persistence, and restarting Cursor.
 
 ---
 
@@ -28,13 +27,11 @@ echo "${UNBOUND_CURSOR_API_KEY:0:8}..."
 
 ## Step 2 — Run the setup script
 
-The setup script handles browser OAuth, API key persistence, and restarting Cursor. Hooks are bundled with the plugin.
+Run the setup script — it handles browser auth, API key persistence, and restarting Cursor:
 
 ```bash
-python3 <PLUGIN_ROOT>/scripts/setup.py --domain gateway.getunbound.ai
+python3 "${CURSOR_PLUGIN_ROOT}/scripts/setup.py" --domain gateway.getunbound.ai
 ```
-
-For local clones, `<PLUGIN_ROOT>` is wherever you cloned the repo. For marketplace installs, it's the plugin's install directory.
 
 The script will:
 1. Open a browser for authentication
@@ -45,17 +42,19 @@ Check the exit code:
 - **Exit code 0**: Setup succeeded.
 - **Non-zero exit code**: Setup failed. Show the script's output to the user and offer to retry.
 
+**Security property:** The API key never appears in chat, bash commands, or terminal output. It exists only inside the setup script's process memory and the RC file on disk.
+
 ---
 
 ## Step 3 — Load the new key into the current shell
 
-The setup script wrote the key to the RC file but it is not yet available in this shell session. Source the RC file:
+The setup script wrote the key to the RC file but it is not yet available in this shell session. Source the RC file so the connectivity check can use it:
 
 ```bash
 source <RC_FILE>
 ```
 
-Use the RC file for the user's OS and shell:
+Use the same RC file the setup script reported (shown in its "Setup Complete!" output). The mapping is:
 
 | OS | Shell | RC file |
 |---|---|---|
@@ -110,7 +109,7 @@ If connectivity failed, end with:
 ```
 API unreachable — plugin installed but running in fail-open mode.
     All actions will be allowed until connectivity is restored.
-    Check your API key and network, then ask about Unbound setup again.
+    Check your API key and network, then run /unbound-cursor:setup again.
 ```
 
 ---
