@@ -10,7 +10,7 @@ import os
 import subprocess
 from pathlib import Path
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 UNBOUND_GATEWAY_URL = "https://api.getunbound.ai"
@@ -81,11 +81,6 @@ def append_to_audit_log(event_data):
         f.write(json.dumps(event_data) + '\n')
 
 
-def handle_deny_and_exit():
-    """Terminate with Cursor's block exit code."""
-    sys.exit(2)
-
-
 def group_events_by_generation(logs):
     """Group events by conversation_id and generation_id."""
     grouped = defaultdict(lambda: defaultdict(list))
@@ -115,6 +110,24 @@ def get_latest_user_prompt(generation_id):
     return latest_prompt
 
 
+def extract_command_for_pretool(event):
+    """Extract command from tool_input based on tool type."""
+    tool_input = event.get('tool_input', {})
+    tool_name = event.get('tool_name', '')
+
+    # Shell/Bash: command field
+    if tool_name in ['Shell', 'Bash'] and 'command' in tool_input:
+        return tool_input['command']
+    # File operations: file_path
+    if 'file_path' in tool_input:
+        return tool_input['file_path']
+    # MCP tools: stringify the input
+    if tool_name == 'MCP':
+        return str(tool_input)
+    # Default: tool name
+    return tool_name
+
+
 def send_to_hook_api(request_body, api_key):
     """Send request to /v1/hooks/pretool endpoint."""
     if not api_key:
@@ -141,37 +154,15 @@ def send_to_hook_api(request_body, api_key):
         return {}
 
 
-def format_hook_response(api_response):
-    """Convert API response to Cursor hook output format (permission/user_message/agent_message)."""
-    if not api_response:
-        return {}
-    decision = api_response.get('decision', 'allow')
-    # Normalise gateway values to Cursor's two-state permission field
-    permission = 'deny' if decision in ('deny', 'block') else 'allow'
-    reason = api_response.get('reason', '')
-    additional_context = api_response.get('additionalContext', '')
-    response = {'permission': permission}
-    if reason:
-        response['user_message'] = reason
-    if additional_context:
-        response['agent_message'] = additional_context
-    return response
-
-
-def process_pre_tool_use_execution(event, api_key, tool_name, command, mcp_server=None, mcp_tool=None):
-    """Process beforeShellExecution or beforeMCPExecution event."""
+def process_pre_tool_use(event, api_key):
+    """Process preToolUse event"""
     generation_id = event.get('generation_id')
     conversation_id = event.get('conversation_id')
     model = event.get('model') or 'auto'
+    tool_name = event.get('tool_name', '')
 
     user_prompt = get_latest_user_prompt(generation_id)
-
-    # Build metadata with the raw event, inject mcp fields if present
-    metadata = dict(event)
-    if mcp_server is not None:
-        metadata['mcp_server'] = mcp_server
-    if mcp_tool is not None:
-        metadata['mcp_tool'] = mcp_tool
+    command = extract_command_for_pretool(event)
 
     request_body = {
         'conversation_id': conversation_id,
@@ -181,13 +172,13 @@ def process_pre_tool_use_execution(event, api_key, tool_name, command, mcp_serve
         'pre_tool_use_data': {
             'tool_name': tool_name,
             'command': command,
-            'metadata': metadata
+            'metadata': event
         },
         'messages': [{'role': 'user', 'content': user_prompt}] if user_prompt else []
     }
 
     api_response = send_to_hook_api(request_body, api_key)
-    return format_hook_response(api_response)
+    return api_response if api_response else {}
 
 
 def process_user_prompt_submit(event, api_key):
@@ -362,43 +353,66 @@ def cleanup_interrupted_requests(logs, current_conversation_id, current_generati
     return logs
 
 
+LOG_RETENTION_DAYS = 1
+
+
 def cleanup_old_logs():
     """
     Manage log file size by removing old generation_ids when log count exceeds 50.
     Keeps only the most recent generation_id's entries to ensure current request is safe.
+    Also prunes entries older than LOG_RETENTION_DAYS on a rolling basis.
     """
     logs = load_existing_logs()
-    
-    # If we have 50 or fewer entries, no cleanup needed
-    if len(logs) <= 50:
-        return
-    
-    # Track generation_ids in order of first appearance
-    generation_order = []
-    seen_generations = set()
-    
-    for log in logs:
-        event = log.get('event', {})
-        gen_id = event.get('generation_id')
-        
-        if gen_id and gen_id not in seen_generations:
-            generation_order.append(gen_id)
-            seen_generations.add(gen_id)
-    
-    # If we have multiple generation_ids and log count > 50,
-    # keep only the most recent generation_id's entries
-    if len(generation_order) > 1:
-        # Keep only the most recent generation_id
-        most_recent_gen_id = generation_order[-1]
-        
-        # Filter logs to keep only the most recent generation
-        kept_logs = [
-            log for log in logs
-            if log.get('event', {}).get('generation_id') == most_recent_gen_id
-        ]
-        
-        # Save the filtered logs
-        save_logs(kept_logs)
+    changed = False
+
+    # Phase 1: Prune entries older than retention period
+    cutoff = (datetime.now().astimezone() - timedelta(days=LOG_RETENTION_DAYS)).isoformat()
+    fresh_logs = [log for log in logs if log.get('timestamp', '') >= cutoff]
+    if len(fresh_logs) < len(logs):
+        logs = fresh_logs
+        changed = True
+
+    # Phase 2: If still > 50 entries, keep only the most recent generation_id
+    if len(logs) > 50:
+        generation_order = []
+        seen_generations = set()
+
+        for log in logs:
+            event = log.get('event', {})
+            gen_id = event.get('generation_id')
+
+            if gen_id and gen_id not in seen_generations:
+                generation_order.append(gen_id)
+                seen_generations.add(gen_id)
+
+        if len(generation_order) > 1:
+            most_recent_gen_id = generation_order[-1]
+            logs = [
+                log for log in logs
+                if log.get('event', {}).get('generation_id') == most_recent_gen_id
+            ]
+            changed = True
+
+    if changed:
+        save_logs(logs)
+
+    # Phase 3: Trim error.log to entries within retention period
+    _trim_error_log(cutoff)
+
+
+def _trim_error_log(cutoff_iso):
+    """Remove error.log lines whose ISO-8601 timestamp prefix is older than cutoff."""
+    try:
+        if not ERROR_LOG.exists():
+            return
+        with open(ERROR_LOG, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        kept = [line for line in lines if line[:25] >= cutoff_iso[:25]]
+        if len(kept) < len(lines):
+            with open(ERROR_LOG, 'w', encoding='utf-8') as f:
+                f.writelines(kept)
+    except Exception:
+        pass
 
 
 def process_stop_event(generation_id, api_key=None):
@@ -462,24 +476,14 @@ def main():
         generation_id = event.get('generation_id')
         conversation_id = event.get('conversation_id')
 
-        # Handle beforeShellExecution / beforeMCPExecution - check policy before execution
-        if hook_event_name == 'beforeShellExecution':
-            response = process_pre_tool_use_execution(event, api_key, 'Shell', event.get('command', ''))
+        # Handle preToolUse - return immediately after decision is made
+        if hook_event_name == 'preToolUse':
+            response = process_pre_tool_use(event, api_key)
             print(json.dumps(response), flush=True)
-            if response.get('permission') == 'deny':
-                handle_deny_and_exit()
-            return
 
-        if hook_event_name == 'beforeMCPExecution':
-            mcp_tool_name = event.get('tool_name', '')
-            # Cursor doesn't provide mcp_server directly; pass tool_name as mcp_tool
-            response = process_pre_tool_use_execution(
-                event, api_key, f'MCP:{mcp_tool_name}', json.dumps(event.get('tool_input') or {}),
-                mcp_server=None, mcp_tool=mcp_tool_name
-            )
-            print(json.dumps(response), flush=True)
-            if response.get('permission') == 'deny':
-                handle_deny_and_exit()
+            # Exit with code 2 to block the action if denied
+            if response.get('decision') == 'deny':
+                sys.exit(2)
             return
 
         # Handle beforeSubmitPrompt - check policy before processing
@@ -487,7 +491,7 @@ def main():
             response = process_user_prompt_submit(event, api_key)
 
             # If denied, transform response for Cursor format and exit
-            if response.get('decision') in ('deny', 'block'):
+            if response.get('decision') == 'deny':
                 cursor_response = {
                     'continue': False,
                     'user_message': response.get('reason', 'Prompt blocked by policy')
@@ -502,16 +506,15 @@ def main():
             'event': event
         }
 
-        # Handle interrupted requests BEFORE appending, so the new generation_id
-        # is not yet in the log and cleanup can detect it as new
+        # Append to audit log
+        append_to_audit_log(log_entry)
+
+        # Handle interrupted requests (new generation in same conversation)
         if hook_event_name == 'beforeSubmitPrompt' and conversation_id and generation_id:
             logs = load_existing_logs()
             cleaned_logs = cleanup_interrupted_requests(logs, conversation_id, generation_id)
             if len(cleaned_logs) < len(logs):
                 save_logs(cleaned_logs)
-
-        # Append to audit log
-        append_to_audit_log(log_entry)
         
         # Process stop event
         if hook_event_name == 'stop' and generation_id:
@@ -525,6 +528,7 @@ def main():
     except Exception as e:
         # Log errors but still output {} to not break Cursor
         log_error(f"Exception in main: {str(e)}")
+        print("{}", file=sys.stderr)
         print(f"Error: {e}", file=sys.stderr)
         print("{}")
 
