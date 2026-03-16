@@ -16,5 +16,7 @@
     "enterprise"
   ],
   "hooks": "hooks/hooks.json",
-  "rules": "./rules/"
+  "rules": "./rules/",
+  "skills": "./skills/",
+  "commands": "./commands/"
 }
