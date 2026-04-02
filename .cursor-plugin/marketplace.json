@@ -1,0 +1,17 @@
+{
+  "name": "unbound-cursor",
+  "owner": {
+    "name": "Unbound Security",
+    "email": "support@getunbound.ai"
+  },
+  "metadata": {
+    "description": "Security, compliance, and observability for Cursor — powered by Unbound."
+  },
+  "plugins": [
+    {
+      "name": "unbound-cursor",
+      "source": ".",
+      "description": "Enforces command policies, DLP and jailbreak guardrails, and streams session analytics to your security dashboard."
+    }
+  ]
+}
