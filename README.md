@@ -25,8 +25,8 @@ Search for **Unbound** in Settings > Plugins, or visit [cursor.com/marketplace](
 **From source**
 
 ```bash
-git clone https://github.com/websentry-ai/cursor-extension.git
-cd cursor-extension
+git clone https://github.com/websentry-ai/cursor-plugin.git
+cd cursor-plugin
 ./install.sh
 ```
 
@@ -47,6 +47,19 @@ After setup, try these in Cursor:
 1. Ask the AI to run `ls` — check your [Unbound dashboard](https://app.getunbound.ai) for the event
 2. Create a BLOCK rule in the dashboard, then ask the AI to run that command — it should be blocked
 3. Enable DLP guardrails, then type a prompt containing a fake SSN — it should be blocked
+
+## Cloud Agents (cursor.com/agents)
+
+Cloud Agents run on headless VMs — there is no browser for OAuth and no persistent shell profile. Use **Cursor Dashboard secrets** instead:
+
+1. Get your API key from [app.getunbound.ai](https://app.getunbound.ai) → Settings → API Keys
+2. Add it as a Cloud Agent secret: **cursor.com → Settings → Cloud Agents → Secrets**
+   - **Name:** `UNBOUND_CURSOR_API_KEY`
+   - **Value:** your API key
+   - **Scope:** your repo or user-wide
+3. Start a new Cloud Agent session — the secret is injected as an environment variable automatically
+
+The plugin hooks read `UNBOUND_CURSOR_API_KEY` from `os.environ` on every invocation, so no shell RC files or Cursor restarts are needed. The setup skill (`/unbound-cursor:setup`) auto-detects Cloud Agent environments and guides users through the dashboard secrets flow.
 
 ## What gets monitored
 
@@ -95,7 +108,7 @@ Or remove the plugin from Cursor's Settings > Plugins panel.
 
 - Dashboard: [app.getunbound.ai](https://app.getunbound.ai)
 - Documentation: [docs.getunbound.ai](https://docs.getunbound.ai)
-- Issues: [github.com/websentry-ai/cursor-extension/issues](https://github.com/websentry-ai/cursor-extension/issues)
+- Issues: [github.com/websentry-ai/cursor-plugin/issues](https://github.com/websentry-ai/cursor-plugin/issues)
 
 ## License
 
