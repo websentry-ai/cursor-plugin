@@ -1,0 +1,11 @@
+{
+  "name": "unbound",
+  "description": "Use Cursor without fear of data leakage. Unbound enforces command policies, DLP and jailbreak guardrails, and streams session analytics to your security dashboard.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Unbound Security",
+    "email": "support@getunbound.ai"
+  },
+  "homepage": "https://getunbound.ai",
+  "license": "MIT"
+}

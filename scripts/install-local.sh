@@ -106,9 +106,12 @@ fi
 rm -rf "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 cp -R "$PLUGIN_SOURCE/.cursor-plugin" "$INSTALL_DIR/"
+cp -R "$PLUGIN_SOURCE/.claude-plugin" "$INSTALL_DIR/"
+cp -R "$PLUGIN_SOURCE/assets" "$INSTALL_DIR/"
 cp -R "$PLUGIN_SOURCE/hooks" "$INSTALL_DIR/"
 cp -R "$PLUGIN_SOURCE/rules" "$INSTALL_DIR/"
 cp -R "$PLUGIN_SOURCE/skills" "$INSTALL_DIR/"
+cp -R "$PLUGIN_SOURCE/commands" "$INSTALL_DIR/"
 cp -R "$PLUGIN_SOURCE/scripts" "$INSTALL_DIR/"
 echo "Copied to $INSTALL_DIR"
 
