@@ -110,7 +110,7 @@ If connectivity failed, end with:
 ```
 API unreachable — plugin installed but running in fail-open mode.
     All actions will be allowed until connectivity is restored.
-    Check your API key and network, then run /unbound:setup again.
+    Check your API key and network, then run /unbound-setup again.
 ```
 
 ---

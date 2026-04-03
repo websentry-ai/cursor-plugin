@@ -32,7 +32,7 @@ Hooks are bundled with the plugin and work immediately — no separate download 
 
 ## Alternative: Skill-guided setup
 
-Run `/unbound:setup` in any Cursor conversation. The AI will walk you through the setup flow.
+Run `/unbound-setup` in any Cursor conversation. The AI will walk you through the setup flow.
 
 ---
 

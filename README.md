@@ -37,7 +37,7 @@ The installer opens your browser automatically. Sign in to your Unbound account 
 Or run the setup skill inside Cursor:
 
 ```
-/unbound:setup
+/unbound-setup
 ```
 
 ### 3. Verify
@@ -72,7 +72,7 @@ The only required configuration is your API key:
 |---|---|
 | `UNBOUND_CURSOR_API_KEY` | Your Unbound API key. Get one at [app.getunbound.ai](https://app.getunbound.ai) > Settings > API Keys |
 
-The installer and `/unbound:setup` skill handle this automatically. The key is saved to your shell profile (`~/.zprofile`, `~/.bashrc`, etc.) and picked up by Cursor on launch.
+The installer and `/unbound-setup` skill handle this automatically. The key is saved to your shell profile (`~/.zprofile`, `~/.bashrc`, etc.) and picked up by Cursor on launch.
 
 ## Enterprise deployment
 
