@@ -10,6 +10,7 @@
   "homepage": "https://getunbound.ai",
   "repository": "https://github.com/websentry-ai/cursor-plugin",
   "license": "MIT",
+  "logo": "assets/avatar.png",
   "keywords": [
     "security",
     "governance",
