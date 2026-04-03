@@ -431,7 +431,7 @@ def main():
     parser.add_argument("--domain", dest="domain", help="Base frontend URL (e.g., gateway.getunbound.ai)")
     parser.add_argument("--clear", action="store_true", help="Undo all changes made by the setup script")
     parser.add_argument("--no-restart", action="store_true", help="Skip automatic Cursor restart")
-    parser.add_argument("--restart-only", action="store_true", help="Only restart Cursor, no setup")
+    parser.add_argument("--restart-only", action="store_true", help="Restart Cursor to load new credentials")
     parser.add_argument("--debug", action="store_true", help="Show detailed debug information")
     args, _ = parser.parse_known_args()
 
