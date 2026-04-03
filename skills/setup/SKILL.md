@@ -1,5 +1,4 @@
 ---
-name: unbound:setup
 description: Configure Unbound AI credentials and verify connectivity for the Cursor plugin. Use when setting up for the first time, reconfiguring with a new API key, or diagnosing connectivity issues.
 user-invocable: true
 ---
