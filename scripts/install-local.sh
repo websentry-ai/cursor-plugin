@@ -14,7 +14,7 @@
 set -euo pipefail
 
 PLUGIN_SOURCE="$(cd "$(dirname "$0")/.." && pwd)"
-PLUGIN_NAME="unbound-cursor"
+PLUGIN_NAME="unbound"
 PLUGIN_KEY="${PLUGIN_NAME}@local"
 PLUGIN_VERSION="1.0.0"
 
@@ -69,6 +69,39 @@ fi
 # ── Install ───────────────────────────────────────────────────
 echo "Installing ${PLUGIN_KEY} from ${PLUGIN_SOURCE}..."
 
+# 0. Clean up old "unbound-cursor" plugin (renamed to "unbound")
+OLD_KEY="unbound-cursor@local"
+OLD_DIR="$HOME/.cursor/plugins/unbound-cursor"
+rm -rf "$OLD_DIR"
+if [ -f "$INSTALLED_JSON" ]; then
+    _INSTALLED_JSON="$INSTALLED_JSON" _OLD_KEY="$OLD_KEY" python3 -c "
+import json, os
+path = os.environ['_INSTALLED_JSON']
+key = os.environ['_OLD_KEY']
+with open(path) as f:
+    data = json.load(f)
+if key in data.get('plugins', {}):
+    del data['plugins'][key]
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+    print('Removed old unbound-cursor entry from installed_plugins.json')
+"
+fi
+if [ -f "$SETTINGS_JSON" ]; then
+    _SETTINGS_JSON="$SETTINGS_JSON" _OLD_KEY="$OLD_KEY" python3 -c "
+import json, os
+path = os.environ['_SETTINGS_JSON']
+key = os.environ['_OLD_KEY']
+with open(path) as f:
+    data = json.load(f)
+if key in data.get('enabledPlugins', {}):
+    del data['enabledPlugins'][key]
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+    print('Removed old unbound-cursor entry from settings.json')
+"
+fi
+
 # 1. Copy plugin files to ~/.cursor/plugins/<name>/
 rm -rf "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
@@ -76,7 +109,6 @@ cp -R "$PLUGIN_SOURCE/.cursor-plugin" "$INSTALL_DIR/"
 cp -R "$PLUGIN_SOURCE/hooks" "$INSTALL_DIR/"
 cp -R "$PLUGIN_SOURCE/rules" "$INSTALL_DIR/"
 cp -R "$PLUGIN_SOURCE/skills" "$INSTALL_DIR/"
-cp -R "$PLUGIN_SOURCE/commands" "$INSTALL_DIR/"
 cp -R "$PLUGIN_SOURCE/scripts" "$INSTALL_DIR/"
 echo "Copied to $INSTALL_DIR"
 
