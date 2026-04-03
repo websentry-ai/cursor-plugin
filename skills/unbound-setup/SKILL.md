@@ -28,16 +28,15 @@ echo "${UNBOUND_CURSOR_API_KEY:0:8}..."
 
 ## Step 2 — Run the setup script
 
-Run the setup script — it handles browser auth, API key persistence, and restarting Cursor:
+Run the setup script — it handles browser auth and API key persistence:
 
 ```bash
-python3 "${CURSOR_PLUGIN_ROOT}/scripts/setup.py" --domain gateway.getunbound.ai
+python3 "${CURSOR_PLUGIN_ROOT}/scripts/setup.py" --domain gateway.getunbound.ai --no-restart
 ```
 
 The script will:
 1. Open a browser for authentication
 2. Save `UNBOUND_CURSOR_API_KEY` to the user's shell RC file
-3. Restart Cursor
 
 Check the exit code:
 - **Exit code 0**: Setup succeeded.
@@ -112,6 +111,25 @@ API unreachable — plugin installed but running in fail-open mode.
     All actions will be allowed until connectivity is restored.
     Check your API key and network, then run /unbound-setup again.
 ```
+
+---
+
+## Step 6 — Offer to restart Cursor
+
+After showing the summary, present the user with two options:
+
+1. **Restart Cursor** — Restart now to load the new Unbound credentials immediately
+2. **Skip** — Unbound will activate on next Cursor restart
+
+If the user chooses **Restart Cursor**, run:
+
+```bash
+python3 "${CURSOR_PLUGIN_ROOT}/scripts/setup.py" --restart-only
+```
+
+If the user chooses **Skip**, tell them:
+
+> "All set! Unbound will activate the next time you restart Cursor."
 
 ---
 
