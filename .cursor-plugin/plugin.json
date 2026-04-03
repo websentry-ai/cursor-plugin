@@ -26,7 +26,6 @@
     "audit",
     "enterprise"
   ],
-  "commands": "./commands/",
   "skills": "./skills/",
   "rules": "./rules/",
   "hooks": "./hooks/hooks.json"
