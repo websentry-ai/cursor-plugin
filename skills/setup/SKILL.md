@@ -1,5 +1,5 @@
 ---
-name: setup
+name: unbound:setup
 description: Configure Unbound AI credentials and verify connectivity for the Cursor plugin. Use when setting up for the first time, reconfiguring with a new API key, or diagnosing connectivity issues.
 user-invocable: true
 ---
@@ -111,7 +111,7 @@ If connectivity failed, end with:
 ```
 API unreachable — plugin installed but running in fail-open mode.
     All actions will be allowed until connectivity is restored.
-    Check your API key and network, then run /unbound-cursor:setup again.
+    Check your API key and network, then run /unbound:setup again.
 ```
 
 ---

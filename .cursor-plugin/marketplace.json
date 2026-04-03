@@ -1,5 +1,5 @@
 {
-  "name": "unbound-cursor",
+  "name": "unbound",
   "owner": {
     "name": "Unbound Security",
     "email": "support@getunbound.ai"
@@ -9,7 +9,7 @@
   },
   "plugins": [
     {
-      "name": "unbound-cursor",
+      "name": "unbound",
       "source": ".",
       "description": "Enforces command policies, DLP and jailbreak guardrails, and streams session analytics to your security dashboard."
     }
