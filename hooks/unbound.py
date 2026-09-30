@@ -7,6 +7,7 @@ Reads JSON events from stdin, appends to agent-audit.log, and processes them on 
 import sys
 import json
 import os
+import platform
 import subprocess
 from pathlib import Path
 from collections import defaultdict
@@ -31,6 +32,40 @@ except Exception:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     AUDIT_LOG = LOG_DIR / "agent-audit.log"
     ERROR_LOG = LOG_DIR / "error.log"
+
+
+def _managed_cursor_hooks_dir():
+    """OS-specific enterprise-managed Cursor hooks directory (where MDM drops its
+    hooks.json). None on an unsupported OS."""
+    system = platform.system().lower()
+    if system == "darwin":
+        return Path("/Library/Application Support/Cursor")
+    if system == "linux":
+        return Path("/etc/cursor")
+    if system == "windows":
+        return Path(os.environ.get("ProgramData", r"C:\ProgramData")) / "Cursor"
+    return None
+
+
+def managed_hook_present():
+    """True when Unbound's enterprise (MDM) hook is installed for Cursor. It fires
+    on the same events as this plugin, so when it is present the plugin must defer
+    or every event is logged and enforced twice. Read-only; fails open (False)."""
+    try:
+        managed_dir = _managed_cursor_hooks_dir()
+        if managed_dir is None:
+            return False
+        hooks_json = managed_dir / "hooks.json"
+        if not hooks_json.exists():
+            return False
+        hooks = json.loads(hooks_json.read_text(encoding="utf-8")).get("hooks", {})
+        return any(
+            "unbound-hook" in (hook.get("command") or "")
+            for entries in hooks.values() if isinstance(entries, list)
+            for hook in entries
+        )
+    except Exception:
+        return False
 
 
 def log_error(message):
@@ -468,6 +503,12 @@ def main():
         try:
             event = json.loads(input_data)
         except json.JSONDecodeError:
+            print("{}")
+            return
+
+        # Defer to the enterprise (MDM) hook when it is installed: it fires on the
+        # same events, so running both logs and enforces every event twice.
+        if managed_hook_present():
             print("{}")
             return
 
