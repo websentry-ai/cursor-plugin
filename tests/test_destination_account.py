@@ -118,9 +118,10 @@ def test_the_turn_sent_on_stop_carries_the_account(tmp_path):
 
 
 def test_a_gh_repo_url_never_carries_its_token():
-    exchange, (entry,) = _shell_entries(f"gh pr create -R https://jdoe:{FAKE_TOKEN}@github.com/acme/app --fill")
-    assert (entry["destination_account"]["host"], entry["destination_account"]["account"]) == ("github.com", "acme")
-    assert FAKE_TOKEN.lower() not in json.dumps(exchange).lower()
+    _, (entry,) = _shell_entries(f"gh pr create -R https://jdoe:{FAKE_TOKEN}@github.com/acme/app --fill")
+    account = entry["destination_account"]
+    assert (account["host"], account["account"]) == ("github.com", "acme")
+    assert FAKE_TOKEN.lower() not in json.dumps(account).lower()
 
 
 def test_an_ssh_config_that_runs_commands_is_never_read(tmp_path):
