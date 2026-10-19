@@ -115,3 +115,18 @@ def test_the_turn_sent_on_stop_carries_the_account(tmp_path):
     (exchange,) = sent
     account = exchange["messages"][-1]["tool_use"][0]["destination_account"]
     assert (account["host"], account["account"], account["context"]) == ("github.com", "jdoe-dev", "origin")
+
+
+def test_a_gh_repo_url_never_carries_its_token():
+    exchange, (entry,) = _shell_entries(f"gh pr create -R https://jdoe:{FAKE_TOKEN}@github.com/acme/app --fill")
+    assert (entry["destination_account"]["host"], entry["destination_account"]["account"]) == ("github.com", "acme")
+    assert FAKE_TOKEN.lower() not in json.dumps(exchange).lower()
+
+
+def test_an_ssh_config_that_runs_commands_is_never_read(tmp_path):
+    marker = tmp_path / "ran"
+    config = tmp_path / "ssh_config"
+    config.write_text(f'Match host * exec "touch {marker}"\n  HostName 10.9.9.9\n')
+    _, (entry,) = _shell_entries(f"ssh -F {config} prod-bastion")
+    assert entry["destination_account"] == {"platform": "ssh", "source": "unknown"}
+    assert not marker.exists()
