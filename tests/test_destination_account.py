@@ -131,3 +131,9 @@ def test_an_ssh_config_that_runs_commands_is_never_read(tmp_path):
     _, (entry,) = _shell_entries(f"ssh -F {config} prod-bastion")
     assert entry["destination_account"] == {"platform": "ssh", "source": "unknown"}
     assert not marker.exists()
+
+
+def test_a_token_in_a_gh_repo_without_a_scheme_never_reaches_the_account(monkeypatch):
+    monkeypatch.setenv("GH_REPO", f"x@{FAKE_TOKEN}@github.com/acme/app")
+    _, (entry,) = _shell_entries("gh pr list")
+    assert FAKE_TOKEN.lower() not in json.dumps(entry.get("destination_account", {})).lower()
