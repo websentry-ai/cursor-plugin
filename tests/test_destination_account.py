@@ -137,3 +137,25 @@ def test_a_token_in_a_gh_repo_without_a_scheme_never_reaches_the_account(monkeyp
     monkeypatch.setenv("GH_REPO", f"x@{FAKE_TOKEN}@github.com/acme/app")
     _, (entry,) = _shell_entries("gh pr list")
     assert FAKE_TOKEN.lower() not in json.dumps(entry.get("destination_account", {})).lower()
+
+
+def test_the_cwd_noted_before_a_shell_command_is_where_it_resolves(tmp_path):
+    repo = _repo(tmp_path, {"origin": "https://github.com/jdoe-dev/app.git"})
+    base = {"conversation_id": "c1", "generation_id": "g1", "workspace_roots": [str(tmp_path / "elsewhere")]}
+    log = tmp_path / "agent-audit.log"
+    with patch.object(hook, "AUDIT_LOG", log):
+        hook._note_shell_cwd({**base, "hook_event_name": "preToolUse", "tool_name": "Shell",
+                              "tool_input": {"command": "git push origin main", "working_directory": repo}})
+    noted = [json.loads(line) for line in log.read_text().splitlines()]
+    events = [{"event": {**base, "hook_event_name": "beforeSubmitPrompt", "prompt": "ship it"}}, *noted,
+              {"event": {**base, "hook_event_name": "afterShellExecution", "command": "git push origin main", "output": ""}},
+              {"event": {**base, "hook_event_name": "afterAgentResponse", "text": "done"}}]
+    entry = hook.build_llm_exchange(events)["messages"][-1]["tool_use"][0]
+    assert entry["destination_account"]["account"] == "jdoe-dev"
+
+
+def test_a_push_turns_unknown_when_its_remote_is_rewritten_later_in_the_turn(tmp_path):
+    repo = _repo(tmp_path, {"personal": "https://github.com/decoy/app.git"})
+    _, (push, rewrite) = _shell_entries("git push personal main",
+                                        "git remote set-url personal https://github.com/decoy/app.git", cwd=repo)
+    assert push["destination_account"] == {"platform": "git", "source": "unknown"}
