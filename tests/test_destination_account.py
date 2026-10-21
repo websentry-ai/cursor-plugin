@@ -159,3 +159,50 @@ def test_a_push_turns_unknown_when_its_remote_is_rewritten_later_in_the_turn(tmp
     _, (push, rewrite) = _shell_entries("git push personal main",
                                         "git remote set-url personal https://github.com/decoy/app.git", cwd=repo)
     assert push["destination_account"] == {"platform": "git", "source": "unknown"}
+
+
+def test_a_subshell_cd_moves_only_the_commands_inside_it(tmp_path):
+    repo = _repo(tmp_path, {"origin": "https://github.com/acme/app.git"})
+    nested = Path(repo, "frontend")
+    subprocess.run(["git", "init", "-q", "-b", "main", str(nested)], check=True)
+    subprocess.run(["git", "-C", str(nested), "remote", "add", "origin", "https://github.com/front/web.git"], check=True)
+    _, entries = _shell_entries("(cd frontend && git push origin main)", "(cd frontend; true) && git push origin main",
+                                cwd=repo)
+    assert [e["destination_account"]["account"] for e in entries] == ["front", "acme"]
+
+
+def test_env_unset_hides_an_inherited_host_and_a_url_port_is_never_the_owner(monkeypatch):
+    monkeypatch.setenv("GH_HOST", "ghe.example.com")
+    _, (unset, ported) = _shell_entries("env -u GH_HOST gh repo view acme/app",
+                                        "gh api https://ghe.example.com:8443/api/v3/repos/other/app")
+    assert unset["destination_account"]["host"] == "github.com"
+    assert (ported["destination_account"]["host"], ported["destination_account"]["account"]) == ("ghe.example.com", "other")
+
+
+def test_sudo_ssh_and_a_canonicalizing_config_are_unknown(tmp_path):
+    config = tmp_path / "config"
+    config.write_text("CanonicalizeHostname yes\nHost prod-bastion\n  HostName 10.0.4.12\n")
+    plain = tmp_path / "plain"
+    plain.write_text("Host prod-bastion\n  HostName 10.0.4.12\n  User deploy\n")
+    _, entries = _shell_entries(f"ssh -F {config} prod-bastion", f"sudo -u nobody ssh -F {plain} prod-bastion")
+    assert [e["destination_account"] for e in entries] == [{"platform": "ssh", "source": "unknown"}] * 2
+
+
+def test_a_command_noted_in_two_folders_gets_no_account(tmp_path):
+    repo = _repo(tmp_path, {"origin": "https://github.com/jdoe-dev/app.git"})
+    other = tmp_path / "other"
+    subprocess.run(["git", "init", "-q", "-b", "main", str(other)], check=True)
+    subprocess.run(["git", "-C", str(other), "remote", "add", "origin", "https://github.com/other/app.git"], check=True)
+    base = {"conversation_id": "c1", "generation_id": "g1", "workspace_roots": [str(tmp_path)]}
+    command = "git push origin main"
+
+    def entries(folders):
+        notes = [{"event": {**base, "hook_event_name": "beforeShellExecution", "command": command, "cwd": f}}
+                 for f in folders]
+        after = {"event": {**base, "hook_event_name": "afterShellExecution", "command": command, "output": ""}}
+        events = [{"event": {**base, "hook_event_name": "beforeSubmitPrompt", "prompt": "ship it"}}, *notes, after,
+                  after, {"event": {**base, "hook_event_name": "afterAgentResponse", "text": "done"}}]
+        return hook.build_llm_exchange(events)["messages"][-1]["tool_use"]
+
+    assert [e.get("destination_account") for e in entries([repo, str(other)])] == [None, None]
+    assert [e["destination_account"]["account"] for e in entries([repo, repo])] == ["jdoe-dev", "jdoe-dev"]
