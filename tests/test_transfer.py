@@ -21,7 +21,7 @@ import pytest
 _ROOT = Path(__file__).parent.parent
 _HOOK_PATH = _ROOT / "hooks" / "unbound.py"
 # Also pinned in websentry-ai/setup tests/test_transfer_destination.py; update both together.
-BLOCK_SHA256 = "7e721b4ef91e0b7be0fc063945e231df4800c4fa7d1d684e6975187f170aee5a"
+BLOCK_SHA256 = "915f54b5ffb052a4356d4651e8942ce385a13d8be1b9ce4dcde70ef139643bce"
 START = "# KEEP IN SYNC: transfer resolution"
 END = "# --- end transfer resolution ---"
 # Not a real credential; it only has to sit where a login goes.
