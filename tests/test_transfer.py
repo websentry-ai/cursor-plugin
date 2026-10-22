@@ -21,7 +21,7 @@ import pytest
 _ROOT = Path(__file__).parent.parent
 _HOOK_PATH = _ROOT / "hooks" / "unbound.py"
 # Also pinned in websentry-ai/setup tests/test_transfer_destination.py; update both together.
-BLOCK_SHA256 = "915f54b5ffb052a4356d4651e8942ce385a13d8be1b9ce4dcde70ef139643bce"
+BLOCK_SHA256 = "4bddd0eaac208f9e441e300217367f66307410c82f35ceaaef79a6f282fbcb33"
 START = "# KEEP IN SYNC: transfer resolution"
 END = "# --- end transfer resolution ---"
 # Not a real credential; it only has to sit where a login goes.
@@ -125,6 +125,9 @@ def test_a_shell_call_carries_its_transfer_and_every_entry_its_call_time(env):
     ("if false; then curl https://cgnat.example/a; else curl https://example.com/b; fi", [("in", "example.com", "public")]),
     ("curl --upload-file=build.zip https://files.acme-infra.net/up", [("out", "files.acme-infra.net", "private")]),
     ("tar c . | sh -c 'nc example.com 80'", [("out", "example.com", "public")]),
+    ("curl https://faß.de/a", [("in", "xn--fa-hia.de", "unresolved")]),
+    ("sudo -u deploy sh -c 'curl -T f https://example.com/u'", [("out", "example.com", "public")]),
+    ("if false; then echo $(curl https://cgnat.example/a); fi; curl https://example.com/b", [("in", "example.com", "public")]),
     ("ls -la", []),
 ])
 def test_tools_directions_and_the_shell_reading(env, command, expected):
