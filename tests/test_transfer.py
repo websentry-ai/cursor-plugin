@@ -21,7 +21,7 @@ import pytest
 _ROOT = Path(__file__).parent.parent
 _HOOK_PATH = _ROOT / "hooks" / "unbound.py"
 # Also pinned in websentry-ai/setup tests/test_transfer_destination.py; update both together.
-BLOCK_SHA256 = "796cbba7e0ba30e543edd039b55727391e76346742589b662fc76d9e80197831"
+BLOCK_SHA256 = "52a96102496501b4cac9df373593cee98bae601960eecf31ef8d41cd27ca8556"
 START = "# KEEP IN SYNC: transfer resolution"
 END = "# --- end transfer resolution ---"
 # Not a real credential; it only has to sit where a login goes.
@@ -126,16 +126,24 @@ def test_a_shell_call_carries_its_transfer_and_every_entry_its_call_time(env):
     ("curl --upload-file=build.zip https://files.acme-infra.net/up", [("out", "files.acme-infra.net", "private")]),
     ("tar c . | sh -c 'nc example.com 80'", [("out", "example.com", "public")]),
     ("curl https://faß.de/a", [("in", "xn--fa-hia.de", "unresolved")]),
-    ("sudo -u deploy sh -c 'curl -T f https://example.com/u'", [("out", "example.com", "public")]),
     ("if false; then echo $(curl https://cgnat.example/a); fi; curl https://example.com/b", [("in", "example.com", "public")]),
     ("curl -T a https://files.acme-infra.net/up --next https://example.com/b", [("out", "files.acme-infra.net", "private"), ("in", "example.com", "public")]),
     ("f () { curl -T x https://cgnat.example/a; }; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("false && ! echo $(curl https://cgnat.example/a); curl https://example.com/b", [("in", "example.com", "public")]),
     ("ls -la", []),
 ])
 def test_tools_directions_and_the_shell_reading(env, command, expected):
     transfer = hook._transfer(command, str(env), {})
     got = [(e.get("direction", ""), e["host"], e["address"]) for e in (transfer or {}).get("endpoints", [])]
     assert got == expected
+
+
+@pytest.mark.skipif(os.name == "nt", reason="the fake ssh is a POSIX script")
+def test_sudo_around_a_command_string_never_looks_up_ssh(env):
+    transfer = hook._transfer("sudo -u deploy sh -c 'scp -F cfg build.zip prod:/srv'", str(env), {})
+    assert transfer["endpoints"] == [{"direction": "out", "host": "prod", "resolved_host": "prod", "address": "unresolved"}]
+    assert not (env / "ssh.log").exists()
+    assert hook._transfer("scp -F cfg build.zip prod:/srv", str(env), {})["endpoints"][0]["resolved_host"] == "10.0.4.12"
 
 
 def test_no_login_or_token_reaches_the_field(env):
