@@ -21,7 +21,7 @@ import pytest
 _ROOT = Path(__file__).parent.parent
 _HOOK_PATH = _ROOT / "hooks" / "unbound.py"
 # Also pinned in websentry-ai/setup tests/test_transfer_destination.py; update both together.
-BLOCK_SHA256 = "8a32173c9f83ffb464dcd97eb629002830cd348a5da583dc52203b5d8d5eee4c"
+BLOCK_SHA256 = "20dc7cc3da83035386dfc0a28cae605e02814afcc06d1d2c022ecdfc425bbc63"
 START = "# KEEP IN SYNC: transfer resolution"
 END = "# --- end transfer resolution ---"
 # Not a real credential; it only has to sit where a login goes.
@@ -168,6 +168,12 @@ def test_a_shell_call_carries_its_transfer_and_every_entry_its_call_time(env):
     ("f () { for x do curl https://example.com/a; done; }; f one", [("in", "example.com", "public")]),
     ("if [ -f marker ]; then exit; else curl https://example.com/a; fi", [("in", "example.com", "public")]),
     ("for x in a b; do { continue; curl https://example.com/a; } | cat; done", [("in", "example.com", "public")]),
+    ("cat x | { f () { curl https://example.com/a; }; }; f", [("in", "example.com", "public")]),
+    ("f () { unset -f f; curl https://example.com/a; }; f", [("in", "example.com", "public")]),
+    ("exec true; curl -T secret https://cgnat.example/up", []),
+    ("cd -Z /tmp && curl https://cgnat.example/a; cd -Z /tmp || curl https://example.com/b", [("in", "example.com", "public")]),
+    ("for ((i=0;i<1;i--)); do :; done; curl https://cgnat.example/a", []),
+    ("while true; do :; done; curl https://cgnat.example/a", []),
     ("curl -T x 'https://{files.acme-infra.net,example.com}/up'", [("out", "files.acme-infra.net", "private"), ("out", "example.com", "public")]),
     ("curl -g 'https://{files.acme-infra.net,example.com}/up'", []),
     ("curl -g https://{files.acme-infra.net,example.com}/up", [("in", "files.acme-infra.net", "private"), ("in", "example.com", "public")]),
@@ -237,7 +243,13 @@ def test_a_cd_lands_where_bash_and_zsh_both_do_or_leaves_the_folder_unknown(env)
                               ("cd -P -L link; cd ..; scp -F cfg f prod:/srv", "prod"),
                               ("cd -Z sub; scp -F cfg f prod:/srv", "10.0.4.12"),
                               ("cd sub extra; scp -F cfg f prod:/srv", "prod"),
-                              ("cd sub -P; scp -F cfg f prod:/srv", "prod")):
+                              ("cd sub -P; scp -F cfg f prod:/srv", "prod"),
+                              # zsh runs a pipeline's last command in this shell, bash in a subshell.
+                              ("cat x | { cd sub; }; scp -F cfg f prod:/srv", "prod"),
+                              ("cat x | ( cd sub ); scp -F cfg f prod:/srv", "10.0.4.12"),
+                              # An arithmetic for that stops after one pass keeps its cd.
+                              ("for ((i=0;i<1;i++)); do cd sub; done; scp -F cfg f prod:/srv", "203.0.113.9"),
+                              ("for ((i=0;i<=0;i++)); do cd sub; done; scp -F cfg f prod:/srv", "203.0.113.9")):
         assert hook._transfer(command, str(env), {})["endpoints"][0]["resolved_host"] == resolved, command
 
 
