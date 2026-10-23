@@ -21,7 +21,7 @@ import pytest
 _ROOT = Path(__file__).parent.parent
 _HOOK_PATH = _ROOT / "hooks" / "unbound.py"
 # Also pinned in websentry-ai/setup tests/test_transfer_destination.py; update both together.
-BLOCK_SHA256 = "b17f61f3e2398916f47212721e7f5bee5196e7fa17d3d6d0e2ee4a485afef546"
+BLOCK_SHA256 = "52f01280736b273d3ee79590411b881ccbc3bdd2e94945d6cb2290f8caf96d90"
 START = "# KEEP IN SYNC: transfer resolution"
 END = "# --- end transfer resolution ---"
 # Not a real credential; it only has to sit where a login goes.
@@ -146,6 +146,14 @@ def test_a_shell_call_carries_its_transfer_and_every_entry_its_call_time(env):
     ("f () { curl -T x https://cgnat.example/a; }; f", [("out", "cgnat.example", "cgnat")]),
     ("curl --resolve example.com:443:10.20.30.40 https://example.com/x", [("in", "example.com", "private")]),
     ("curl --data --next https://example.com/a", [("out", "example.com", "public")]),
+    ("f () { return; curl https://cgnat.example/a; }; f; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("f () { curl -T x https://example.com/a; return; curl https://cgnat.example/b; }; f", [("out", "example.com", "public")]),
+    ("for x in a; do break; curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("for x in; do curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("exit; curl https://cgnat.example/a", []),
+    ("curl -T x 'https://{files.acme-infra.net,example.com}/up'", [("out", "files.acme-infra.net", "private"), ("out", "example.com", "public")]),
+    ("curl -g 'https://{files.acme-infra.net,example.com}/up'", []),
+    ("curl -g https://{files.acme-infra.net,example.com}/up", [("in", "files.acme-infra.net", "private"), ("in", "example.com", "public")]),
     ("ls -la", []),
 ])
 def test_tools_directions_and_the_shell_reading(env, command, expected):
@@ -169,6 +177,18 @@ def test_a_piped_compound_keeps_its_cd_and_a_called_function_moves_the_caller(en
     for command, resolved in (("{ cd sub; } | cat; scp -F cfg f prod:/srv", "10.0.4.12"),
                               ("f () { cd sub; }; f; scp -F cfg f prod:/srv", "203.0.113.9"),
                               ("f () { cd sub; }; f | cat; scp -F cfg f prod:/srv", "10.0.4.12")):
+        assert hook._transfer(command, str(env), {})["endpoints"][0]["resolved_host"] == resolved, command
+
+
+@pytest.mark.skipif(os.name == "nt", reason="the fake ssh is a POSIX script")
+def test_a_cd_that_may_not_have_run_leaves_the_folder_unknown(env):
+    (env / "sub").mkdir()
+    (env / "sub" / "cfg").write_text("Host prod\n  HostName 203.0.113.9\n")
+    for command, resolved in (("test -f marker && cd sub; scp -F cfg f prod:/srv", "prod"),
+                              ("mkdir x && cd sub && scp -F cfg f prod:/srv", "prod"),
+                              ("if [ -d sub ]; then cd sub; fi; scp -F cfg f prod:/srv", "prod"),
+                              ("cd sub && scp -F cfg f prod:/srv", "203.0.113.9"),
+                              ("f () { cd sub; return; cd ..; }; f; scp -F cfg f prod:/srv", "203.0.113.9")):
         assert hook._transfer(command, str(env), {})["endpoints"][0]["resolved_host"] == resolved, command
 
 
