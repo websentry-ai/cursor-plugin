@@ -21,7 +21,7 @@ import pytest
 _ROOT = Path(__file__).parent.parent
 _HOOK_PATH = _ROOT / "hooks" / "unbound.py"
 # Also pinned in websentry-ai/setup tests/test_transfer_destination.py; update both together.
-BLOCK_SHA256 = "351768a461759f360cd4a5c49c49ea3063a718c815224c3078f16f191d99f31d"
+BLOCK_SHA256 = "04e079d7013077bd8795b5a16a9d41adf94bde37c33e7cc53f7da252b643e9a0"
 START = "# KEEP IN SYNC: transfer resolution"
 END = "# --- end transfer resolution ---"
 # Not a real credential; it only has to sit where a login goes.
@@ -133,6 +133,18 @@ def test_a_shell_call_carries_its_transfer_and_every_entry_its_call_time(env):
     ("false && ! true; false && curl https://cgnat.example/a; curl https://example.com/b", [("in", "example.com", "public")]),
     ("if true; then f () { curl https://cgnat.example/a; }; fi; curl https://example.com/b", [("in", "example.com", "public")]),
     ("{ nc example.com 80; } < request.txt", [("out", "example.com", "public")]),
+    ("{ nc example.com 80 < /dev/null; } < request.txt", [("", "example.com", "public")]),
+    ("echo hi | { nc example.com 80 < /dev/null; }", [("", "example.com", "public")]),
+    ("tar c . | echo $(nc example.com 80)", [("out", "example.com", "public")]),
+    ("{ echo $(ssh prod 'cat f'); } > out.txt", []),
+    ("ssh prod cat > /dev/null | tar x", []),
+    ("! ( true ) && curl https://cgnat.example/a; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("! { true; false; } && curl https://example.com/a", [("in", "example.com", "public")]),
+    ("if true; then false; fi && curl https://cgnat.example/a; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("! ! false && curl https://cgnat.example/a; ! ! true && curl https://example.com/b", [("in", "example.com", "public")]),
+    ("false && echo x | curl https://cgnat.example/a; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("f () { curl -T x https://cgnat.example/a; }; f", [("out", "cgnat.example", "cgnat")]),
+    ("curl --resolve example.com:443:10.20.30.40 https://example.com/x", [("in", "example.com", "private")]),
     ("ls -la", []),
 ])
 def test_tools_directions_and_the_shell_reading(env, command, expected):
@@ -147,6 +159,16 @@ def test_sudo_around_a_command_string_never_looks_up_ssh(env):
     assert transfer["endpoints"] == [{"direction": "out", "host": "prod", "resolved_host": "prod", "address": "unresolved"}]
     assert not (env / "ssh.log").exists()
     assert hook._transfer("scp -F cfg build.zip prod:/srv", str(env), {})["endpoints"][0]["resolved_host"] == "10.0.4.12"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="the fake ssh is a POSIX script")
+def test_a_piped_compound_keeps_its_cd_and_a_called_function_moves_the_caller(env):
+    (env / "sub").mkdir()
+    (env / "sub" / "cfg").write_text("Host prod\n  HostName 203.0.113.9\n")
+    for command, resolved in (("{ cd sub; } | cat; scp -F cfg f prod:/srv", "10.0.4.12"),
+                              ("f () { cd sub; }; f; scp -F cfg f prod:/srv", "203.0.113.9"),
+                              ("f () { cd sub; }; f | cat; scp -F cfg f prod:/srv", "10.0.4.12")):
+        assert hook._transfer(command, str(env), {})["endpoints"][0]["resolved_host"] == resolved, command
 
 
 def test_no_login_or_token_reaches_the_field(env):
