@@ -21,7 +21,7 @@ import pytest
 _ROOT = Path(__file__).parent.parent
 _HOOK_PATH = _ROOT / "hooks" / "unbound.py"
 # Also pinned in websentry-ai/setup tests/test_transfer_destination.py; update both together.
-BLOCK_SHA256 = "143f66e0d246e3ca4b3dfa936f79ea6e3180726417641ee2766b68eee1200f3f"
+BLOCK_SHA256 = "8a32173c9f83ffb464dcd97eb629002830cd348a5da583dc52203b5d8d5eee4c"
 START = "# KEEP IN SYNC: transfer resolution"
 END = "# --- end transfer resolution ---"
 # Not a real credential; it only has to sit where a login goes.
@@ -158,6 +158,16 @@ def test_a_shell_call_carries_its_transfer_and_every_entry_its_call_time(env):
     ("for ((i=0;i<1;i++)); do break; curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
     ("select x in; do curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
     ("f () { curl https://cgnat.example/a; }; unset -f f; f; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("f () { curl https://example.com/a; }; [ -f marker ] && unset -f f; f", [("in", "example.com", "public")]),
+    ("(( 0 )) && curl https://cgnat.example/a; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("(( 1 )) || curl https://cgnat.example/a; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("for ((i=0;i<0;i++)); do curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("for ((i=0;i<1;i++)) do curl https://example.com/a; done", [("in", "example.com", "public")]),
+    ("for x; do curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("select x; do curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("f () { for x do curl https://example.com/a; done; }; f one", [("in", "example.com", "public")]),
+    ("if [ -f marker ]; then exit; else curl https://example.com/a; fi", [("in", "example.com", "public")]),
+    ("for x in a b; do { continue; curl https://example.com/a; } | cat; done", [("in", "example.com", "public")]),
     ("curl -T x 'https://{files.acme-infra.net,example.com}/up'", [("out", "files.acme-infra.net", "private"), ("out", "example.com", "public")]),
     ("curl -g 'https://{files.acme-infra.net,example.com}/up'", []),
     ("curl -g https://{files.acme-infra.net,example.com}/up", [("in", "files.acme-infra.net", "private"), ("in", "example.com", "public")]),
@@ -212,6 +222,35 @@ def test_a_bare_assignment_updates_an_exported_variable(env):
                               ("RSYNC_RSH='ssh -o HostName=203.0.113.9'; rsync -a f prod:/srv", "prod"),
                               ("RSYNC_RSH='ssh -o HostName=203.0.113.9'; export RSYNC_RSH; rsync -a f prod:/srv",
                                "203.0.113.9")):
+        assert hook._transfer(command, str(env), {})["endpoints"][0]["resolved_host"] == resolved, command
+
+
+@pytest.mark.skipif(os.name == "nt", reason="the fake ssh is a POSIX script")
+def test_a_cd_lands_where_bash_and_zsh_both_do_or_leaves_the_folder_unknown(env):
+    # -P resolves links, so a later `..` leaves the real folder; a cd every shell rejects stays put, and one bash 3,
+    # bash 5 and zsh read differently leaves the folder unknown.
+    (env / "sub" / "inner").mkdir(parents=True)
+    (env / "sub" / "cfg").write_text("Host prod\n  HostName 203.0.113.9\n")
+    (env / "link").symlink_to(env / "sub" / "inner")
+    for command, resolved in (("cd link; cd ..; scp -F cfg f prod:/srv", "10.0.4.12"),
+                              ("cd -P link; cd ..; scp -F cfg f prod:/srv", "203.0.113.9"),
+                              ("cd -P -L link; cd ..; scp -F cfg f prod:/srv", "prod"),
+                              ("cd -Z sub; scp -F cfg f prod:/srv", "10.0.4.12"),
+                              ("cd sub extra; scp -F cfg f prod:/srv", "prod"),
+                              ("cd sub -P; scp -F cfg f prod:/srv", "prod")):
+        assert hook._transfer(command, str(env), {})["endpoints"][0]["resolved_host"] == resolved, command
+
+
+def test_appends_declarations_and_unset_follow_bash_and_zsh(env):
+    # += appends where every shell does; declare -x exports; an unset that may leave the function leaves what it
+    # sets unknown.
+    for command, resolved in (("export RSYNC_RSH=ssh; RSYNC_RSH+=' -o HostName=203.0.113.9'; rsync -a f prod:/srv",
+                               "203.0.113.9"),
+                              ("export RSYNC_RSH=ssh; export RSYNC_RSH+=' -o HostName=203.0.113.9'; rsync -a f prod:/srv",
+                               "prod"),
+                              ("declare -x RSYNC_RSH='ssh -o HostName=203.0.113.9'; rsync -a f prod:/srv", "203.0.113.9"),
+                              ("f () { export RSYNC_RSH='ssh -o HostName=203.0.113.9'; }; unset f; f; rsync -a f prod:/srv",
+                               "prod")):
         assert hook._transfer(command, str(env), {})["endpoints"][0]["resolved_host"] == resolved, command
 
 
