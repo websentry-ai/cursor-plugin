@@ -21,7 +21,7 @@ import pytest
 _ROOT = Path(__file__).parent.parent
 _HOOK_PATH = _ROOT / "hooks" / "unbound.py"
 # Also pinned in websentry-ai/setup tests/test_transfer_destination.py; update both together.
-BLOCK_SHA256 = "52f01280736b273d3ee79590411b881ccbc3bdd2e94945d6cb2290f8caf96d90"
+BLOCK_SHA256 = "143f66e0d246e3ca4b3dfa936f79ea6e3180726417641ee2766b68eee1200f3f"
 START = "# KEEP IN SYNC: transfer resolution"
 END = "# --- end transfer resolution ---"
 # Not a real credential; it only has to sit where a login goes.
@@ -39,6 +39,9 @@ for line in open(config) if config else []:
         current = words[1:]
     elif words and words[0] == "HostName" and host in current:
         name = words[1]
+for flag, value in zip(args, args[1:]):
+    if flag == "-o" and value.lower().startswith("hostname="):
+        name = value.split("=", 1)[1]
 print("hostname " + name)
 """
 
@@ -151,6 +154,10 @@ def test_a_shell_call_carries_its_transfer_and_every_entry_its_call_time(env):
     ("for x in a; do break; curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
     ("for x in; do curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
     ("exit; curl https://cgnat.example/a", []),
+    ("[ -f marker ] && { exit; }; curl https://example.com/a", [("in", "example.com", "public")]),
+    ("for ((i=0;i<1;i++)); do break; curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("select x in; do curl https://cgnat.example/a; done; curl https://example.com/b", [("in", "example.com", "public")]),
+    ("f () { curl https://cgnat.example/a; }; unset -f f; f; curl https://example.com/b", [("in", "example.com", "public")]),
     ("curl -T x 'https://{files.acme-infra.net,example.com}/up'", [("out", "files.acme-infra.net", "private"), ("out", "example.com", "public")]),
     ("curl -g 'https://{files.acme-infra.net,example.com}/up'", []),
     ("curl -g https://{files.acme-infra.net,example.com}/up", [("in", "files.acme-infra.net", "private"), ("in", "example.com", "public")]),
@@ -188,7 +195,23 @@ def test_a_cd_that_may_not_have_run_leaves_the_folder_unknown(env):
                               ("mkdir x && cd sub && scp -F cfg f prod:/srv", "prod"),
                               ("if [ -d sub ]; then cd sub; fi; scp -F cfg f prod:/srv", "prod"),
                               ("cd sub && scp -F cfg f prod:/srv", "203.0.113.9"),
-                              ("f () { cd sub; return; cd ..; }; f; scp -F cfg f prod:/srv", "203.0.113.9")):
+                              ("f () { cd sub; return; cd ..; }; f; scp -F cfg f prod:/srv", "203.0.113.9"),
+                              ("cd sub; for x in a b; do cd ..; done; scp -F cfg f prod:/srv", "prod"),
+                              ("cd sub; for x in a; do cd ..; done; scp -F cfg f prod:/srv", "10.0.4.12"),
+                              ("cd nowhere; cd sub; scp -F cfg f prod:/srv", "prod"),
+                              ("if [ -f y ]; then g () { cd sub; }; fi; g; scp -F cfg f prod:/srv", "prod"),
+                              ("cd -P sub; scp -F cfg f prod:/srv", "203.0.113.9"),
+                              ("cd -- sub; scp -F cfg f prod:/srv", "203.0.113.9")):
+        assert hook._transfer(command, str(env), {})["endpoints"][0]["resolved_host"] == resolved, command
+
+
+def test_a_bare_assignment_updates_an_exported_variable(env):
+    # rsync reads RSYNC_RSH from its environment, which a later plain assignment changes once it is exported.
+    for command, resolved in (("export RSYNC_RSH='ssh -o HostName=10.9.9.9'; RSYNC_RSH='ssh -o HostName=203.0.113.9'; "
+                               "rsync -a f prod:/srv", "203.0.113.9"),
+                              ("RSYNC_RSH='ssh -o HostName=203.0.113.9'; rsync -a f prod:/srv", "prod"),
+                              ("RSYNC_RSH='ssh -o HostName=203.0.113.9'; export RSYNC_RSH; rsync -a f prod:/srv",
+                               "203.0.113.9")):
         assert hook._transfer(command, str(env), {})["endpoints"][0]["resolved_host"] == resolved, command
 
 
