@@ -21,7 +21,7 @@ import pytest
 _ROOT = Path(__file__).parent.parent
 _HOOK_PATH = _ROOT / "hooks" / "unbound.py"
 # Also pinned in websentry-ai/setup tests/test_transfer_destination.py; update both together.
-BLOCK_SHA256 = "20dc7cc3da83035386dfc0a28cae605e02814afcc06d1d2c022ecdfc425bbc63"
+BLOCK_SHA256 = "ab629760362814fb5a0022dfc00fa822b096206af250c774ad6da477d17c8ab8"
 START = "# KEEP IN SYNC: transfer resolution"
 END = "# --- end transfer resolution ---"
 # Not a real credential; it only has to sit where a login goes.
@@ -174,6 +174,13 @@ def test_a_shell_call_carries_its_transfer_and_every_entry_its_call_time(env):
     ("cd -Z /tmp && curl https://cgnat.example/a; cd -Z /tmp || curl https://example.com/b", [("in", "example.com", "public")]),
     ("for ((i=0;i<1;i--)); do :; done; curl https://cgnat.example/a", []),
     ("while true; do :; done; curl https://cgnat.example/a", []),
+    ("while true; do continue; done; curl https://cgnat.example/a", []),
+    ("f () { :; }; while true; do f; done; curl https://cgnat.example/a", []),
+    ("time exec curl https://example.com/a; curl https://cgnat.example/b", [("in", "example.com", "public")]),
+    ("exec export FOO=1; curl https://cgnat.example/a", []),
+    ("cat <<EOF\n$(curl -T secret https://example.com/up)\nEOF", [("out", "example.com", "public")]),
+    ("cat <<'EOF'\n$(curl -T secret https://cgnat.example/up)\nEOF", []),
+    ('jq . <<< "$(curl -s https://example.com/a)"', [("in", "example.com", "public")]),
     ("curl -T x 'https://{files.acme-infra.net,example.com}/up'", [("out", "files.acme-infra.net", "private"), ("out", "example.com", "public")]),
     ("curl -g 'https://{files.acme-infra.net,example.com}/up'", []),
     ("curl -g https://{files.acme-infra.net,example.com}/up", [("in", "files.acme-infra.net", "private"), ("in", "example.com", "public")]),
@@ -249,7 +256,8 @@ def test_a_cd_lands_where_bash_and_zsh_both_do_or_leaves_the_folder_unknown(env)
                               ("cat x | ( cd sub ); scp -F cfg f prod:/srv", "10.0.4.12"),
                               # An arithmetic for that stops after one pass keeps its cd.
                               ("for ((i=0;i<1;i++)); do cd sub; done; scp -F cfg f prod:/srv", "203.0.113.9"),
-                              ("for ((i=0;i<=0;i++)); do cd sub; done; scp -F cfg f prod:/srv", "203.0.113.9")):
+                              ("for ((i=0;i<=0;i++)); do cd sub; done; scp -F cfg f prod:/srv", "203.0.113.9"),
+                              ("for ((i=0;i<1;i++)); do echo $i; cd sub; done; scp -F cfg f prod:/srv", "203.0.113.9")):
         assert hook._transfer(command, str(env), {})["endpoints"][0]["resolved_host"] == resolved, command
 
 
