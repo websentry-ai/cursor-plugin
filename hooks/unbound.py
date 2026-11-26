@@ -7,6 +7,7 @@ Reads JSON events from stdin, appends to agent-audit.log, and processes them on 
 import sys
 import json
 import os
+import platform
 import subprocess
 from pathlib import Path
 from collections import defaultdict
@@ -154,6 +155,17 @@ def send_to_hook_api(request_body, api_key):
         return {}
 
 
+_DEVICE_OSES = {'Darwin': 'macos', 'Linux': 'linux', 'Windows': 'windows'}
+
+
+def device_os():
+    """'macos', 'linux' or 'windows' for this machine, or None when the hook can't tell; never raises."""
+    try:
+        return _DEVICE_OSES.get(platform.system())
+    except Exception:
+        return None
+
+
 def process_pre_tool_use(event, api_key):
     """Process preToolUse event"""
     generation_id = event.get('generation_id')
@@ -176,6 +188,10 @@ def process_pre_tool_use(event, api_key):
         },
         'messages': [{'role': 'user', 'content': user_prompt}] if user_prompt else []
     }
+    # The gateway reads `/ETC/x` as /etc only on macOS, whose disks ignore case.
+    device = device_os()
+    if device:
+        request_body['pre_tool_use_data']['os'] = device
 
     api_response = send_to_hook_api(request_body, api_key)
     return api_response if api_response else {}
